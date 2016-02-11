@@ -31,6 +31,7 @@ THRES_U = 2.1
 REPETITIONS = 5
 
 def query(s, cmd):
+    print("issued", cmd)
     msg = cmd.strip() + "\n"
     s.send(msg.encode("ascii"))
     data = ""
@@ -172,61 +173,68 @@ def measure(s):
     return data_u
 
 print("ready to start")
-o = []
+sc = []
+v = []
 for t in range(REPETITIONS):
+    print("ROUND %d" % t)
     try:
         data_u = [float(u) for u in measure(s)]
     except:
         print("an error occured")
-
-    data_u = trim(data_u, 0.01)
-
-    fft = [abs(f) for f in np.fft.rfft(data_u)]
-    uppp = len(data_u) / fft.index(max(fft[1:])) + 1            # voltage points per period
-#                                                ↑↑↑ ← wtf???
-
-    corr = [np.correlate(data_u, ramp(i, period = uppp))[0] for i in range(int(uppp))]
-    max_corr = max(corr)
-    max_corr_i = corr.index(max_corr)
+    else:
+        v += data_u
+        data_u = trim(data_u, 0.01)
     
-#    plt.subplot(3, 1, 1)
-#    plt.plot(data_u)
-#    plt.subplot(3, 1, 2)
-    data_i = ramp(max_corr_i, period = uppp, length = len(data_u))
-#    plt.plot(data_i)
-#    plt.plot(fft[1:])
+        fft = [abs(f) for f in np.fft.rfft(data_u)]
+        uppp = len(data_u) / fft.index(max(fft[1:])) + 1            # voltage points per period
+    #                                                ↑↑↑ ← wtf???
     
-    # plt.plot(ramp(max_corr_i), data_u)
-    
-#    n = 0
-#    for u, i in zip(data_u, data_i):
-#        n += 1
-#        print(n, '\t', u, '\t', i)
-   
-    th = False   
-    th_i = None
-    n = 0
-    while n < min(len(data_u), len(data_i)):
-        u = data_u[n]
-        if u > THRES_U:
-            if (not th) and (th_i is None or n - th_i > uppp / 2):
-                o.append(data_i[n])
-                th_i = n
-                n += int(uppp / 2)
-                th = True
-        else:
-            if th:
-                th = False
-        n += 1
+        corr = [np.correlate(data_u, ramp(i, period = uppp))[0] for i in range(int(uppp))]
+        max_corr = max(corr)
+        max_corr_i = corr.index(max_corr)
+        
+    #    plt.subplot(3, 1, 1)
+    #    plt.plot(data_u)
+    #    plt.subplot(3, 1, 2)
+        data_i = ramp(max_corr_i, period = uppp, length = len(data_u))
+    #    plt.plot(data_i)
+    #    plt.plot(fft[1:])
+        
+        # plt.plot(ramp(max_corr_i), data_u)
+        
+    #    n = 0
+    #    for u, i in zip(data_u, data_i):
+    #        n += 1
+    #        print(n, '\t', u, '\t', i)
+       
+        th = False   
+        th_i = None
+        n = 1
+        while n < min(len(data_u), len(data_i)):
+            u = data_u[n]
+            i = data_i[n]
+            if u > THRES_U and data_u[n-1] < THRES_U:
+                if (not th) and (th_i is None or n - th_i > uppp / 2):
+                    sc.append(i - (i - data_i[n-1]) / (u - data_u[n-1]) * (u - THRES_U))
+                    th_i = n
+                    n += int(uppp / 2)
+                    th = True
+            else:
+                if th:
+                    th = False
+            n += 1
 
-h = np.histogram(o)
-print(h)
+# h = np.histogram(sc)
 
 #    plt.subplot(3, 1, 3)
-plt.hist(h, bins='auto')
+plt.hist(sc, bins=20)
 
 fn = 'plot.png'
 plt.savefig(fn)
+
+np.savetxt('voltage.csv', v)
+np.savetxt('sc.csv', sc)
+
 subprocess.call(['cacaview', fn])
 s.close()
 print("connection closed")
