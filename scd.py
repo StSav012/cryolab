@@ -17,33 +17,46 @@ WAVE_DCYC = 100
 CURR_HIGH = 2.0e-6
 CURR_LOW = 0
 PM = False
-DURATION = 12 / WAVE_FREQ
-COUNT = 80
+DURATION = 10 / WAVE_FREQ
+COUNT = 60
 COMPLIANCE = 3
 
 TOTAL_COUNT = DURATION * WAVE_FREQ * COUNT
 if TOTAL_COUNT > 1024:
     raise "too many points"
-APER = 0.2 / (WAVE_FREQ * COUNT)
+APER = 0.1 / (WAVE_FREQ * COUNT)
 DELAY = 1
 
 THRES_U = 2.1
 REPETITIONS = 5
 
-def query(s, cmd):
+def query(s, cmd, remote=False):
     print("issued", cmd)
     msg = cmd.strip() + "\n"
     s.send(msg.encode("ascii"))
-    data = ""
+    data = b''
     if cmd.split()[0].endswith("?"):
         c = b' '
-        while c[0] >= 10 and len(data) < BUFFER_SIZE - 1:
+        while len(data) < BUFFER_SIZE - 1:
             try:
                 c = s.recv(1)
-                data += c.decode("ascii")
+                if c[0] in [b'\n'[0], b'\r'[0]]:
+                    if len(data) == 0:
+                        continue
+                    elif len(data) == BUFFER_SIZE - 2:
+                        print("response ended")
+                        break
+                    if remote:
+                        remote = False
+                    else:
+                        print("response ended")
+                        break
+                else:
+                    data += c
             except:
                 break
-        return data.strip()
+        print("received", data)
+        return data.decode("ascii").strip()
     else:
         return None
 
@@ -52,18 +65,19 @@ def remote_query(s, cmd):
 #        if query(s, "SOUR:PDEL:NVPR?") != "1":          # check again
 #            raise IOError("No suitable Model 2182A with the correct firmware revision is properly connected to the RS-232 port")
     msg = "SYST:COMM:SER:SEND \"" + cmd.strip() + "\""
-    query(s, msg)
+    query(s, msg, remote=True)
     ret_msg = ""
     if cmd.split()[0].endswith("?"):
-        data = query(s, "SYST:COMM:SER:ENT?")
+        data = query(s, "SYST:COMM:SER:ENT?", remote=True)
         n = 0
         while len(data) == 0 and n < 42:
-            data = query(s, "SYST:COMM:SER:ENT?")
+            time.sleep(DELAY)
+            data = query(s, "SYST:COMM:SER:ENT?", remote=True)
             n += 1
         ret_msg += data.strip()
         print("data len =", len(data), "cmd =", cmd)
         while len(data) == BUFFER_SIZE - 2:
-            data = query(s, "SYST:COMM:SER:ENT?")
+            data = query(s, "SYST:COMM:SER:ENT?", remote=True)
             ret_msg += data.strip()
             print("data len =", len(data), "cmd =", cmd)
         return ret_msg
@@ -79,7 +93,7 @@ except:
     sys.exit(0)
 else:
     print("connected to %s:%d" % (TCP_IP, TCP_PORT))
-s.settimeout(0.25)
+s.settimeout(4)
 
 ###############
 ###############
@@ -118,8 +132,8 @@ def measure(s):
 #        "SAMP:COUN " + repr(int(TOTAL_COUNT)), 
 #        "TRIG:COUN 1",
 #        "TRIG:COUN " + repr(int(TOTAL_COUNT)),          # Sets measure count; 1 to 9999 or INF.
-        "TRIG:DEL:AUTO OFF",
-        "TRIG:DEL " + repr(0.0 / (WAVE_FREQ * COUNT)),  # Sets delay.
+#        "TRIG:DEL:AUTO OFF",
+#        "TRIG:DEL " + repr(0.0 / (WAVE_FREQ * COUNT)),  # Sets delay.
 #        "TRIG:TIM " + repr(1 / (WAVE_FREQ * COUNT)),  # Sets timer interval.
 #        "TRIG:SOUR TIM",
     ]
@@ -129,6 +143,9 @@ def measure(s):
 #        time.sleep(1)
 
     cmds_start = [
+#        "*CLS",
+#        "STAT:QUE?",
+#        "*ESR 0",
         "SOUR:CURR:COMP " + repr(COMPLIANCE),           # Sets compliance to COMPLIANCE.
         "SOUR:WAVE:FUNC RAMP",                          # Selects ramp wave.
         "SOUR:WAVE:FREQ " + repr(WAVE_FREQ),            # Sets frequency to WAVE_FREQ.
@@ -147,6 +164,7 @@ def measure(s):
     ]
     for cmd in cmds_start:
         query(s, cmd)
+#        time.sleep(1)
 
     query(s, "SOUR:WAVE:ARM")                           # Arms waveform.
     while not query(s, "SOUR:WAVE:ARM?") == "1":
@@ -177,65 +195,77 @@ sc = []
 v = []
 for t in range(REPETITIONS):
     print("ROUND %d" % t)
+    m = measure(s)
     try:
-        data_u = [float(u) for u in measure(s)]
+        data_u = [float(u) for u in m]
+#        print(len(data_u))
+        for u in data_u:
+            if u < -2. * COMPLIANCE or u > 2. * COMPLIANCE:
+                raise "extreme voltage value: %f" % u
     except:
-        print("an error occured")
+        print("an error occured while processing", m)
     else:
-        v += data_u
-        data_u = trim(data_u, 0.01)
+        data_u = trim(data_u[:], 0.01)
+        v += data_u[:]
     
-        fft = [abs(f) for f in np.fft.rfft(data_u)]
-        uppp = len(data_u) / fft.index(max(fft[1:])) + 1            # voltage points per period
-    #                                                ↑↑↑ ← wtf???
+        if len(data_u) > 2:
+            fft = [abs(f) for f in np.fft.rfft(data_u)]
+            uppp = len(data_u) / fft.index(max(fft[1:])) + 1            # voltage points per period
+        #                                                ↑↑↑ ← wtf???
+        
+            corr = [np.correlate(data_u, ramp(i, period = uppp))[0] for i in range(int(uppp))]
+            max_corr = max(corr)
+            max_corr_i = corr.index(max_corr)
+            
+#            plt.subplot(3, 1, 1)
+#            plt.plot(data_u)
+#            plt.subplot(3, 1, 2)
+            data_i = ramp(max_corr_i, period = uppp, length = len(data_u))
+#            plt.plot(data_i)
+        #    plt.plot(fft[1:])
+            
+            # plt.plot(ramp(max_corr_i), data_u)
+            
+#            n = 0
+#            for u, i in zip(data_u, data_i):
+#                n += 1
+#                print(n, '\t', u, '\t', i)
+           
+            th = False   
+            th_i = None
+            n = 1
+            while n < min(len(data_u), len(data_i)):
+                u = data_u[n]
+                i = data_i[n]
+                if u > THRES_U and data_u[n-1] < THRES_U:
+                    if (not th) and (th_i is None or n - th_i > uppp / 2):
+                        sc.append(i - (i - data_i[n-1]) / (u - data_u[n-1]) * (u - THRES_U))
+                        th_i = n
+                        n += int(uppp / 2)
+                        th = True
+                else:
+                    if th:
+                        th = False
+                n += 1
+        else:
+            print("too few data points:", data_u)
+#    if t < REPETITIONS - 1:
+#        time.sleep(8)
+
+if len(sc) > 1:
+    # h = np.histogram(sc)
     
-        corr = [np.correlate(data_u, ramp(i, period = uppp))[0] for i in range(int(uppp))]
-        max_corr = max(corr)
-        max_corr_i = corr.index(max_corr)
-        
-    #    plt.subplot(3, 1, 1)
-    #    plt.plot(data_u)
-    #    plt.subplot(3, 1, 2)
-        data_i = ramp(max_corr_i, period = uppp, length = len(data_u))
-    #    plt.plot(data_i)
-    #    plt.plot(fft[1:])
-        
-        # plt.plot(ramp(max_corr_i), data_u)
-        
-    #    n = 0
-    #    for u, i in zip(data_u, data_i):
-    #        n += 1
-    #        print(n, '\t', u, '\t', i)
-       
-        th = False   
-        th_i = None
-        n = 1
-        while n < min(len(data_u), len(data_i)):
-            u = data_u[n]
-            i = data_i[n]
-            if u > THRES_U and data_u[n-1] < THRES_U:
-                if (not th) and (th_i is None or n - th_i > uppp / 2):
-                    sc.append(i - (i - data_i[n-1]) / (u - data_u[n-1]) * (u - THRES_U))
-                    th_i = n
-                    n += int(uppp / 2)
-                    th = True
-            else:
-                if th:
-                    th = False
-            n += 1
-
-# h = np.histogram(sc)
-
 #    plt.subplot(3, 1, 3)
-plt.hist(sc, bins=20)
+    plt.hist(sc, bins=20)
+    
+    fn = 'plot.png'
+    plt.savefig(fn)
+    
+    np.savetxt('voltage.csv', v)
+    np.savetxt('sc.csv', sc)
 
-fn = 'plot.png'
-plt.savefig(fn)
+    subprocess.call(['cacaview', fn])
 
-np.savetxt('voltage.csv', v)
-np.savetxt('sc.csv', sc)
-
-subprocess.call(['cacaview', fn])
 s.close()
 print("connection closed")
     

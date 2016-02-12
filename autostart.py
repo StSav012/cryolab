@@ -79,11 +79,12 @@ class worker_gauge(Thread):
                 except:
                     pass
                 if self.ser.is_open:
-                    print(port.device + ' opened')
+                    print('gauge at', port.device, 'opened')
                     break
     def read_pressure(self):
         cmd = "001M^"
         msg = cmd + "\r"
+        print("reading pressure from", self.ser.port)
         while self.ser.is_open:
             try:
                 self.ser.write(msg.encode('ascii'))
@@ -122,6 +123,7 @@ class worker_gauge(Thread):
                 print("invalid checksum:", cks)
                 continue
             self.pressure = value
+            print("Pressure:", self.pressure)
             break
         else:
             self.open_serial()
@@ -133,13 +135,13 @@ class worker_gauge(Thread):
                 pump.do(True)
                 self.read_pressure()
                 print("pressure:", self.pressure)
-                if self.pressure < 1e-2:
+                if not(self.pressure is None) and self.pressure < 1e-2:
                     print("ready to start the compressor")
                     try:
                         cmd = "usbrelay QHF2G_1=1"
                         result = Popen(cmd, shell=True, stdout=PIPE)
                         time.sleep(1)
-                        r = requests.post("http://rp3:5000/helium_compressor/do", data={'action': 1})
+                        r = requests.post("http://localhost/helium_compressor/do", data={'action': 1})
                         print(r.status_code, r.reason)
                     except:
                         pass
