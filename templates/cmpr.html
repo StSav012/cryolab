@@ -109,21 +109,29 @@ setInterval(update_values, timePeriod);
 "use strict";
 $(document).ready(function() {
     $("input#on").click(function() {
-        $.post("/helium_compressor/do",
-        {
-          action: +1,    // 0 = Off, 1 = On
-        },
-        function(data, status) {
-            alert(data);
+        $.ajax({
+            type: 'post',
+            url: '/helium_compressor/do',
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                action:          1           // 0 = Off, 1 = On
+            }),
+            success: function(data, status) {
+                alert(data);
+            }
         });
     });
     $("input#off").click(function() {
-        $.post("/helium_compressor/do",
-        {
-          action: +0,    // 0 = Off, 1 = On
-        },
-        function(data, status) {
-            alert(data);
+        $.ajax({
+            type: 'post',
+            url: '/helium_compressor/do',
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                action:          0           // 0 = Off, 1 = On
+            }),
+            success: function(data, status) {
+                alert(data);
+            }
         });
     });
 });
