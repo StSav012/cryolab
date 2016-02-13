@@ -1040,7 +1040,7 @@ app.url_map.strict_slashes = False
 # app.debug = True
 if not app.debug:
     formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
-    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
+    handler = TimedRotatingFileHandler('/cryolab/python/logs/wsgi.log', when='midnight', interval=1, backupCount=5)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
     log = logging.getLogger('werkzeug')

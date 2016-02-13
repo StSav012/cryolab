@@ -1,10 +1,34 @@
 import socket
 import time
+import sys
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import subprocess
 
 TCP_IP = '192.168.0.12'
 TCP_PORT = 1394
 BUFFER_SIZE = 256
 POWER_LINE_FREQUENCY = 50
+
+WAVE_FREQ = 1
+WAVE_DCYC = 100
+CURR_HIGH = 2.0e-6
+CURR_LOW = 0
+PM = False
+DURATION = 12 / WAVE_FREQ
+COUNT = 80
+COMPLIANCE = 3
+
+TOTAL_COUNT = DURATION * WAVE_FREQ * COUNT
+if TOTAL_COUNT > 1024:
+    raise "too many points"
+APER = 0.2 / (WAVE_FREQ * COUNT)
+DELAY = 1
+
+THRES_U = 2.1
+REPETITIONS = 5
 
 def query(s, cmd):
     msg = cmd.strip() + "\n"
@@ -45,116 +69,66 @@ def remote_query(s, cmd):
     else:
         return None
 
+print("connecting to %s:%d" % (TCP_IP, TCP_PORT))
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((TCP_IP, TCP_PORT))
+try:
+    s.connect((TCP_IP, TCP_PORT))
+except:
+    print("failed to connect %s:%d" % (TCP_IP, TCP_PORT))
+    sys.exit(0)
+else:
+    print("connected to %s:%d" % (TCP_IP, TCP_PORT))
 s.settimeout(0.25)
 
-def iv_curve(s, num=1):
-    query(s, "*RST")                            # Restores 6221 defaults.
+###############
+###############
+###############
 
-    cmds_rem_start = [
-        "VOLT:RANG 10",
-        "volt:nplc 0.1"
-    ]
-    for cmd in cmds_rem_start:
-        remote_query(s, cmd)
+def ramp(x_offset, period = None, length = None):
+    if period is None:
+        period = COUNT
+    if length is None:
+        length = period
+    amplitude = CURR_HIGH - CURR_LOW
+    y_offset = CURR_LOW
+    return [(amplitude * ((i + x_offset) - int((i + x_offset) / period) * period) / period + y_offset) for i in range(round(length))]
 
-    INT = 5
-    COUNT = 251
-    CURR_HIGH = 50e-3
-    CURR_LOW = 0
-    PULSE_WIDTH = 6e-4
-    SOURCE_DELAY = 2e-4
-    CURR_BIAS = 0
-    CURR_START = CURR_LOW
-    CURR_STOP = CURR_HIGH
-    CURR_STEP = (CURR_STOP - CURR_START) / (COUNT - 1)
-    CURR_DELAY = INT/POWER_LINE_FREQUENCY
-    SWEEP = True
+def trim(a, eps):
+    n = 1
+    while n < len(a) and abs(a[n] - a[0]) < eps:
+        n += 1
+    m = len(a) - 1
+    while m > n and abs(a[m] - a[-1]) < eps:
+        m -= 1
+    return a[n:m]
 
-    cmds_start = [
-        "SOUR:CURR:COMP 3",                             # Sets compliance to 3V.
-        "SOUR:CURR " + repr(CURR_BIAS),                 # Set bias current to CURR_BIAS.
-        "SOUR:PDEL:HIGH " + repr(CURR_HIGH),            # Sets pulse high value to CURR_HIGH.
-        "SOUR:PDEL:LOW " + repr(CURR_LOW),              # Sets pulse low value to CURR_LOW.
-        "SOUR:PDEL:WIDT " + repr(PULSE_WIDTH),          # Sets pulse width to PULSE_WIDTH.
-        "SOUR:PDEL:SDEL " + repr(SOURCE_DELAY),         # Sets source delay to SOURCE_DELAY.
-        "SOUR:PDEL:COUN " + repr(COUNT),                # Sets pulse count to COUNT.
-        "SOUR:PDEL:RANG BEST",                          # Selects the best source range for fixed output.
-        "SOUR:SWE:RANG BEST",                           # Selects the best source range for sweep.
-        "SOUR:SWE:SPAC LIN",                            # Selects linear staircase sweep.
-        "SOUR:CURR:STAR " + repr(CURR_START),           # Sets start current to CURR_START.
-        "SOUR:CURR:STOP " + repr(CURR_STOP),            # Sets stop current to CURR_STOP.
-        "SOUR:CURR:STEP " + repr(CURR_STEP),            # Sets step current to CURR_STEP.
-        "SOUR:DEL " + repr(CURR_DELAY),                 # Sets delay to CURR_DELAY.
-        "SOUR:SWE:COUN 1",                              # Sets sweep count to 1.
-        "SOUR:SWE:CAB ON",                              # Enables compliance abort.
-        "SOUR:PDEL:SWE " + ("ON" if SWEEP else "OFF"),  # Enables or disables sweep function.
-        "SOUR:PDEL:INT " + repr(INT),                   # Sets pulse interval to INT PLC (power line cycles) = INT × (1/50) s.
-        "SOUR:PDEL:LME 2",                              # Sets for two low pulse measurements.
-                             # Sets buffer size to COUNT points. Should be the same as Pulse Delta count.
-        "UNIT V",                                       # Selects measurement unit.
-    ]
-    for cmd in cmds_start:
-        query(s, cmd)
-
-    for xxx in range(num):
-        query(s, "TRAC:CLE"),                           # Clears buffer of readings.
-        query(s, "TRAC:FEED:CONT NEXT"),                # Enables buffer.
-        query(s, "SOUR:PDEL:ARM")                       # Arms Pulse Delta.
-        while not query(s, "SOUR:PDEL:ARM?") == "1":
-            time.sleep(0.1)
-        query(s, "INIT:IMM")                            # Starts Pulse Delta measurements.
-        time.sleep(COUNT * INT / POWER_LINE_FREQUENCY)
-        query(s, "SOUR:SWE:ABOR")
-        query(s, "FORM:ELEM READ,SOUR")
-    #   print(query(s, "TRAC:DATA:TYPE?"))
-        data = query(s, "TRAC:DATA?").split(',')
-        n = 0
-        for u, i in zip(data[0::2], data[1::2]):
-            n += 1
-            print(n, '\t', i, u)
-    #cmds_calc = [
-    #    "CALC2:FORM MEAN",                              # Selects the mean buffer calculation.
-    #    "CALC2:STAT ON",                                # Enables buffer calculation.
-    #    "CALC2:IMM",                                    # Performs the mean calculation.
-    #]
-    #for cmd in cmds_calc:
-    #    query(s, cmd)
-    #print(query(s, "CALC2:DATA?"))                      # Requests the result of the mean calculation.
-
-def ramp(s):
-    WAVE_FREQ = 1
-    WAVE_DCYC = 100
-    CURR_HIGH = 1.0e-6
-    CURR_LOW = 0
-    PM = False
-    DURATION = 2
-    COUNT = 21
-
+def measure(s):
     query(s, "*RST")                                    # Restores 6221 defaults.
     remote_query(s, "*RST")                             # Restores 2182A defaults.
 
     cmds_rem_start = [
-        "VOLT:RANG 10",
-#        "VOLT:NPLC " + repr(POWER_LINE_FREQUENCY / WAVE_FREQ / (COUNT - 1) / 5),# Specifies integration rate in PLCs: 0.01 to POWER_LINE_FREQUENCY.
-        "VOLT:APER " + repr(0.2 / WAVE_FREQ / (COUNT - 1)), # Specifies integration rate in seconds: (0.01 / POWER_LINE_FREQUENCY) to 1.
+        "VOLT:RANG " + repr(COMPLIANCE),
+#        "VOLT:NPLC " + repr(POWER_LINE_FREQUENCY * APER),# Specifies integration rate in PLCs: 0.01 to POWER_LINE_FREQUENCY.
+        "VOLT:APER " + repr(APER),                      # Specifies integration rate in seconds: (0.01 / POWER_LINE_FREQUENCY) to 1.
         "TRAC:CLE",                                     # Clears buffer of readings.
-        "TRAC:POIN " + repr(int(DURATION * WAVE_FREQ * COUNT)), # Specifies size of buffer; 2 to 1024.
-#        "TRAC:FEED SENS",                               # Selects source of readings for buffer; SENSe[1], CALCulate[1], or NONE.
+        "TRAC:POIN " + repr(int(TOTAL_COUNT)),          # Specifies size of buffer; 2 to 1024.
+#        "TRAC:FEED SENS",                              # Selects source of readings for buffer; SENSe[1], CALCulate[1], or NONE.
 #        "TRAC:FEED:CONT NEV",                          # Selects buffer control mode; NEXT or NEVer.
-#        "TRIG:COUN " + repr(1),                         # Sets measure count; 1 to 9999 or INF.
-#        "TRIG:DEL 0",                                   # Sets no delay.
-#        "TRIG:DEL:AUTO OFF",
-        "TRIG:TIM " + repr(1 / WAVE_FREQ / (COUNT - 1)),  # Sets timer interval.
-        "TRIG:SOUR TIM",
+#        "SAMP:COUN " + repr(int(TOTAL_COUNT)), 
+#        "TRIG:COUN 1",
+#        "TRIG:COUN " + repr(int(TOTAL_COUNT)),          # Sets measure count; 1 to 9999 or INF.
+        "TRIG:DEL:AUTO OFF",
+        "TRIG:DEL " + repr(0.0 / (WAVE_FREQ * COUNT)),  # Sets delay.
+#        "TRIG:TIM " + repr(1 / (WAVE_FREQ * COUNT)),  # Sets timer interval.
+#        "TRIG:SOUR TIM",
     ]
     for cmd in cmds_rem_start:
         print(cmd)
         remote_query(s, cmd)
+#        time.sleep(1)
 
     cmds_start = [
-        "SOUR:CURR:COMP 1",                             # Sets compliance to 1V.
+        "SOUR:CURR:COMP " + repr(COMPLIANCE),           # Sets compliance to COMPLIANCE.
         "SOUR:WAVE:FUNC RAMP",                          # Selects ramp wave.
         "SOUR:WAVE:FREQ " + repr(WAVE_FREQ),            # Sets frequency to WAVE_FREQ.
         "SOUR:WAVE:AMPL " + repr(CURR_HIGH),            # Sets amplitude to CURR_HIGH.
@@ -178,41 +152,84 @@ def ramp(s):
         time.sleep(0.1)
     remote_query(s, "TRAC:FEED:CONT NEXT")
     remote_query(s, "INIT:CONT ON")
-    time.sleep(0.82)
 #    remote_query(s, "INIT:IMM")
-    query(s, "SOUR:WAVE:INIT")                          # Turns on output, trigger waveform.
-#    data_u = []
-#    for n in range(DURATION * WAVE_FREQ * COUNT):
-#        query(s, "*TRG")
-#        data_u.append(remote_query(s, "FETC?"))
-#        time.sleep(1.0 / WAVE_FREQ / COUNT)
+    time.sleep(DELAY)
+    print("waveform is armed")
+    query(s, "SOUR:WAVE:INIT")                          # Turns on output, triggers waveform.
+    print("waveform is on")
+    print("waiting")
     time.sleep(DURATION)
+    print("no more")
     remote_query(s, "ABOR")
-    query(s, "SOUR:WAVE:ABOR")                          # Stops generating waveform.
-#    while not remote_query(s, "*OPC?") == "1":
-#        time.sleep(0.1)
+#    time.sleep(DELAY)
+#    query(s, "SOUR:WAVE:ABOR")                          # Stops generating waveform.
 
-#    print(remote_query(s, "TRAC:POIN?"))
-#    print(remote_query(s, "READ?"))
-#    print(remote_query(s, "TRAC:DATA?"))
-    data_u = remote_query(s, "TRAC:DATA?").split(',')
-#    print(data_u)
-    n = 0
-    for u in data_u:
-        i = None
-        if len(u) > 0:
-            i = float(u) / 0.39e6 # CURR_LOW + (CURR_HIGH - CURR_LOW) / (COUNT - 1) * (n % COUNT)
-        else:
-            i = ""
-        n += 1
-        print(n, '\t', i, '\t', u)
+    data_u = remote_query(s, "TRAC:DATA?").split(';')[-1].split(',')
 
     time.sleep(1)
-    print("garbage:", remote_query(s, "*OPC?"))      # clear buffer
+    print("garbage:", remote_query(s, "*OPC?")[:-1])      # clear buffer
+    
+    return data_u
 
+print("ready to start")
+o = []
+for t in range(REPETITIONS):
+    try:
+        data_u = [float(u) for u in measure(s)]
+    except:
+        print("an error occured")
 
-iv_curve(s, 3)
-#ramp(s)
+    data_u = trim(data_u, 0.01)
 
+    fft = [abs(f) for f in np.fft.rfft(data_u)]
+    uppp = len(data_u) / fft.index(max(fft[1:])) + 1            # voltage points per period
+#                                                ↑↑↑ ← wtf???
+
+    corr = [np.correlate(data_u, ramp(i, period = uppp))[0] for i in range(int(uppp))]
+    max_corr = max(corr)
+    max_corr_i = corr.index(max_corr)
+    
+#    plt.subplot(3, 1, 1)
+#    plt.plot(data_u)
+#    plt.subplot(3, 1, 2)
+    data_i = ramp(max_corr_i, period = uppp, length = len(data_u))
+#    plt.plot(data_i)
+#    plt.plot(fft[1:])
+    
+    # plt.plot(ramp(max_corr_i), data_u)
+    
+#    n = 0
+#    for u, i in zip(data_u, data_i):
+#        n += 1
+#        print(n, '\t', u, '\t', i)
+   
+    th = False   
+    th_i = None
+    n = 0
+    while n < min(len(data_u), len(data_i)):
+        u = data_u[n]
+        if u > THRES_U:
+            if (not th) and (th_i is None or n - th_i > uppp / 2):
+                o.append(data_i[n])
+                th_i = n
+                n += int(uppp / 2)
+                th = True
+        else:
+            if th:
+                th = False
+        n += 1
+
+h = np.histogram(o)
+print(h)
+
+#    plt.subplot(3, 1, 3)
+plt.hist(h, bins='auto')
+
+fn = 'plot.png'
+plt.savefig(fn)
+subprocess.call(['cacaview', fn])
 s.close()
+print("connection closed")
+    
+print("done")
 
