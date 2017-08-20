@@ -4,6 +4,8 @@ from flask import Flask
 from flask import render_template
 from flask import jsonify
 from flask import request
+from flask import send_from_directory
+import os
 import serial
 import serial.tools.list_ports
 import time
@@ -493,7 +495,7 @@ class worker_tmpr(Thread):
             try:
                 self.read_temperatures()
                 self.read_output()
-                time.sleep(1)
+                time.sleep(0.25)
             except (KeyboardInterrupt, SystemExit):
                 worker_tmpr().stop()
                 sys.exit(0)
