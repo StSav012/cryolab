@@ -1,3 +1,5 @@
+import logging
+from logging.handlers import TimedRotatingFileHandler
 from flask import Flask
 from flask import render_template
 from flask import jsonify
@@ -50,7 +52,18 @@ def hex2bits(hex_str):
     return state
 
 app = Flask(__name__)
-app.debug = True
+app.debug = False
+if not app.debug:
+    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.WARNING)
+    log.addHandler(handler)
+    app.logger.addHandler(handler)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0')
 
 @app.route('/')
 def index():
@@ -445,7 +458,6 @@ class worker_tmpr(Thread):
                             msg += ','
                         msg += str(item)
                     print(msg)
-                    continue
                     msg += '\n'
                     try:
                         self.ser.write(msg.encode('ascii'))
@@ -465,6 +477,7 @@ class worker_tmpr(Thread):
         while True:
             try:
                 self.read_temperatures()
+                self.read_output()
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 worker_tmpr().stop()

@@ -48,11 +48,11 @@ def iv_curve(s, num=1):
         remote_query(s, cmd)
 
     INT = 5
-    COUNT = 21
-    CURR_HIGH = 1.1e-6
+    COUNT = 251
+    CURR_HIGH = 50e-3
     CURR_LOW = 0
-    PULSE_WIDTH = 12e-3
-    SOURCE_DELAY = 2e-3
+    PULSE_WIDTH = 6e-4
+    SOURCE_DELAY = 2e-4
     CURR_BIAS = 0
     CURR_START = CURR_LOW
     CURR_STOP = CURR_HIGH
@@ -170,7 +170,7 @@ def ramp(s):
 #        print(n, '\t', i, u)
 
 
-ramp(s)
+iv_curve(s, 3)
 
 s.close()
 

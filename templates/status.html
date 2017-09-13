@@ -17,7 +17,7 @@
 <!doctype html>
 <html>
 <head>
-<title>Hello, Master</title>
+<title>Hello, {% if master_mind %}Master{% else %}World{% endif %}</title>
 <script type=text/javascript src="{{url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
 <link rel="stylesheet" href="{{url_for('static', filename='main.css') }}">
 <script src="{{url_for('static', filename='amcharts/amcharts.js') }}"></script>
@@ -32,10 +32,8 @@ var chart = AmCharts.makeChart("chartdiv", {
   "marginRight": 40,
   "marginLeft": 40,
   "autoMarginOffset": 20,
-  //"mouseWheelZoomEnabled": true,
   "valueAxes": [{
     "id": "temperature",
-    "axisAlpha": 0,
     "position": "left",
     "ignoreAxisWidth": true,
     "precision": 2,
@@ -52,8 +50,6 @@ var chart = AmCharts.makeChart("chartdiv", {
       "animationDuration": 0
     },
     "bullet": "none",
-    "bulletSize": 5,
-    "hideBulletsCount": 50,
     "lineThickness": 2,
     "valueField": "temperature1",
     "balloonText": "<span style='font-size:18px;'>[[value]] K</span>"
@@ -65,26 +61,17 @@ var chart = AmCharts.makeChart("chartdiv", {
       "animationDuration": 0
     },
     "bullet": "none",
-    "bulletSize": 5,
-    "hideBulletsCount": 50,
     "lineThickness": 2,
     "valueField": "temperature2",
     "balloonText": "<span style='font-size:18px;'>[[value]] K</span>"
   }],
   "chartScrollbar": {
-    "graph": "tmpr_temperature1",
     "oppositeAxis": false,
     "offset": 30,
-    "scrollbarHeight": 80,
-    "backgroundAlpha": 0,
-    "selectedBackgroundAlpha": 0.1,
-    "selectedBackgroundColor": "#888888",
-    "graphFillAlpha": 0,
-    "graphLineAlpha": 0.5,
-    "selectedGraphFillAlpha": 0,
-    "selectedGraphLineAlpha": 1,
+    "scrollbarHeight": 10,
     "autoGridCount": true,
-    "color": "#AAAAAA"
+    "color": "transparent",
+    "updateOnReleaseOnly": true
   },
   "chartCursor": {
     "pan": true,
@@ -92,7 +79,6 @@ var chart = AmCharts.makeChart("chartdiv", {
     "valueLineBalloonEnabled": true,
     "cursorAlpha": 1,
     "cursorColor": "#258cbb",
-    //"limitToGraph": "tmpr_temperature",
     "valueLineAlpha": 0.2,
     "valueZoomable": true,
     "categoryBalloonDateFormat": "HH:NN:SS",
@@ -114,7 +100,58 @@ var chart = AmCharts.makeChart("chartdiv", {
   "export": {
     "enabled": true
   },
-  "dataProvider": []
+  "dataProvider": [],
+  "export": {
+    "enabled": true,
+    "libs": {
+      "path": "{{url_for('static', filename='amcharts/plugins/export/libs/') }}"
+    },
+    "menu": [{
+    "class": "export-main",
+    "label": "Export",
+    "menu": [
+      {
+        "label": "Download as …",
+        "menu": [{
+          "format": "PNG",
+          "label": "PNG"
+        }, {
+          "format": "SVG",
+          "label": "SVG"
+        }, {
+          "format": "PDF",
+          "label": "PDF"
+        }]
+      }, {
+        "label": "Save as …",
+        "menu": [{
+          "label": "CSV",
+          "click": function() {
+              this.toCSV({
+                data: plotData
+              }, function(data) {
+                this.download(data, this.defaults.formats.CSV.mimeType, "temperature.csv");
+              });
+            }
+        }, {
+          "label": "XLSX",
+          "click": function() {
+              this.toXLSX({
+                data: plotData
+              }, function(data) {
+                this.download(data, this.defaults.formats.XLSX.mimeType, "temperature.xlsx");
+              });
+            }
+        }]
+      }, {
+        "label": "Annotate …",
+        "action": "draw"
+      }, {
+        "label": "Print",
+        "format": "PRINT"
+      }]
+    }]
+  }
 });
 chart.isZoomed = false;
 chart.ignoreZoomed = true;
@@ -132,16 +169,35 @@ chart.addListener("dataUpdated", function(event) {
     if (!chart.isZoomed) {
         return;
     }
-    chart.zoomToIndexes(event.chart.dataProvider.length - (chart.zoomEnd-chart.zoomStart+1), event.chart.dataProvider.length);
+    var zoomRange = chart.zoomEnd - chart.zoomStart + 1;
+    chart.zoomToIndexes(event.chart.dataProvider.length - zoomRange, event.chart.dataProvider.length);
 });
 /******************************************************************************/
+var lastRequestTime = Date();
+var lastResponseTime = Date();
+var plotData = [];
 function update_values() {
     $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    var now = new Date();
+    if (now - lastRequestTime < 900) {
+        return;
+    }
+    else {
+        lastRequestTime = now;
+    }
     $.getJSON($SCRIPT_ROOT+"/json",
         function(data) {
+            var now = new Date();
+            if (now - lastResponseTime < 900) {
+                return;
+            }
+            else {
+                lastResponseTime = now;
+            }
+
             if (data.cmpr_pressures != null &&
                 data.cmpr_pressures[0] != "None" &&
-                data.cmpr_pressures[0] != "") {
+                data.cmpr_pressures[0] !== "") {
                 $("#pressure1").text(data.cmpr_pressures[0]);
             }
             else {
@@ -149,7 +205,7 @@ function update_values() {
             }
             if (data.cmpr_temperatures != null &&
                 data.cmpr_temperatures[0] != "None" &&
-                data.cmpr_temperatures[0] != "") {
+                data.cmpr_temperatures[0] !== "") {
                 for (var i = 0; i < 3; ++i) {
                     $("#cmpr_temperature" + (i+1)).text(data.cmpr_temperatures[i]);
                 }
@@ -186,7 +242,7 @@ function update_values() {
                 for (var i = 0; i < 2; ++i) {
                     dict["time"] = new Date();
                     if (data.tmpr_temperatures[i] != "None" &&
-                        data.tmpr_temperatures[i] != "" &&
+                        data.tmpr_temperatures[i] !== "" &&
                         data.tmpr_temperatures[i] != null) {
                             $("#tmpr_temperature" + (i+1)).text(data.tmpr_temperatures[i]);
                             var key = "temperature" + (i+1);
@@ -204,19 +260,58 @@ function update_values() {
                 dict = {};
             }
             if (Object.keys(dict).length > 1 && !$("#tmpr_discard_data")[0].checked) {
-                chart.dataProvider.push(dict);
+                plotData.push(dict);
+                var maxLength = 200;
+                var displayedLength = 0;
+                for (var i = 0; i < plotData.length; ++i) {
+                    if (plotData[i].time >= chart.chartScrollbar.startTime &&
+                        plotData[i].time <= chart.chartScrollbar.endTime) {
+                        ++displayedLength;
+                    }
+                }
+                if (displayedLength > maxLength) {
+                    chart.dataProvider = [];
+                    var denom = displayedLength / maxLength;
+                    for (var i = 0; Math.round(i) < plotData.length; i += denom) {
+                        chart.dataProvider.push(plotData[Math.round(i)]);
+                    }
+                }
+                else {
+                    chart.dataProvider.push(dict);
+                }
                 chart.ignoreZoomed = true;
                 chart.validateData();
             }
             $("#time").text(new Date().toLocaleTimeString());
+
+            if (data.tmpr_output != null) {
+                for (var i = 0; i < 2; ++i) {
+                    if (data.tmpr_output[i] != "None" &&
+                        data.tmpr_output[i] !== "" &&
+                        data.tmpr_output[i] != null) {
+                            $("#tmpr_output" + (i+1)).text(data.tmpr_output[i]);
+                            var key = "output" + (i+1);
+                    }
+                    else {
+                        $("#tmpr_output" + (i+1)).html("<b>??</b>");
+                    }
+                }
+            }
+            else {
+                for (var i = 0; i < 2; ++i) {
+                    $("#tmpr_output" + (i+1)).html("<b>??</b>");
+                }
+            }
         });
 }
 setInterval(update_values, 1000)
 $(document).ready(function() {
     $("input#tmpr_clear").click(function() {
-        chart.dataProvider = {};
+        chart.dataProvider = [];
+        plotData = [];
         chart.validateData();
     });
+
 });
 </script>
 {% if master_mind -%}
