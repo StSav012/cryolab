@@ -426,7 +426,7 @@ class worker_tmpr(Thread):
                     self.output[index] = None
             else:
                 self.output[index] = None
-                if resp != None:
+                if resp != None and len(resp) > 0:
                     r = int(resp)
                     if r == 1:
                         print("heater open load for " + letter)

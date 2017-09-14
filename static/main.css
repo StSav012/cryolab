@@ -50,6 +50,12 @@ input.action_button {
     cursor: pointer;
 }
 
+input.action_button:disabled {
+    color: gray;
+    background-color: dimgray;
+    text-shadow: none;
+}
+
 input.action_button:active {
     background-color: maroon;
 }
@@ -192,6 +198,9 @@ button.error.on:disabled {
 button.error.off:disabled {
     color: gray;
     background-color: #221111;
+}
+table#tmpr_pid {
+    display: none;
 }
 #chartdiv {
   min-width: 500px;

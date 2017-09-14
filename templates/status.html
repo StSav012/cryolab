@@ -237,8 +237,13 @@ function update_values() {
                     $($("button#{{ id }}")[0]).addClass("off").removeClass("on");
                 }
             {% endfor %}
+            {% if master_mind -%}
+                $("input#cmpr_on").prop('disabled', (data.cmpr_system_on === true));
+                $("input#cmpr_off").prop('disabled', (data.cmpr_system_on === false));
+            {%- endif %}
 /******************************************************************************/
             var dict = {};
+            var tmpr_ok = true;
             if (data.tmpr_temperatures != null) {
                 for (var i = 0; i < 2; ++i) {
                     dict["time"] = new Date();
@@ -251,12 +256,14 @@ function update_values() {
                     }
                     else {
                         $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
+                        tmpr_ok = false;
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
+                    tmpr_ok = false;
                 }
                 dict = {};
             }
@@ -295,14 +302,24 @@ function update_values() {
                     }
                     else {
                         $("#tmpr_output" + (i+1)).html("<b>??</b>");
+                        tmpr_ok = false;
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_output" + (i+1)).html("<b>??</b>");
+                    tmpr_ok = false;
                 }
             }
+            {% if master_mind -%}
+                if (tmpr_ok) {
+                    $("table#tmpr_pid").show();
+                }
+                else {
+                    $("table#tmpr_pid").hide();
+                }
+            {%- endif %}
         });
 }
 setInterval(update_values, 1000)
@@ -494,8 +511,8 @@ $(document).ready(function() {
 {% if master_mind -%}
         <tr>
             <td class="align_center" colspan=3>
-                <input type="button" class="action_button" id="cmpr_on" value="Turn compressor on!">
-                <input type="button" class="action_button" id="cmpr_off" value="Turn compressor off!">
+                <input type="button" class="action_button" id="cmpr_on" value="Turn compressor on!" disabled>
+                <input type="button" class="action_button" id="cmpr_off" value="Turn compressor off!" disabled>
             </td>
         </tr>
 {%- endif %}
@@ -520,7 +537,7 @@ $(document).ready(function() {
 {% if master_mind -%}
         <tr>
             <td>
-                <table class="wide">
+                <table class="wide" id="tmpr_pid">
                     <tr>
                         <td>
                             <table class="wide">
@@ -538,7 +555,7 @@ $(document).ready(function() {
                                     <td>
                                         <select id="tmpr_input_list">
                                             <option value="0">None</option>
-                                            <option value="1">A</option>
+                                            <option value="1" selected>A</option>
                                             <option value="2">B</option>
                                         </select>
                                     </td>
@@ -548,7 +565,7 @@ $(document).ready(function() {
                                     <td>
                                         <select id="tmpr_pid_mode_list">
                                             <option value="0">Off</option>
-                                            <option value="1">Closed Loop PID</option>
+                                            <option value="1" selected>Closed Loop PID</option>
                                             <option value="2">Zone</option>
                                             <option value="3">Open Loop</option>
                                             <option value="4">Monitor Out</option>
@@ -562,7 +579,7 @@ $(document).ready(function() {
                                         <select id="tmpr_pid_range_list">
                                             <option value="0">Off</option>
                                             <option value="1">Low</option>
-                                            <option value="2">Medium</option>
+                                            <option value="2" selected>Medium</option>
                                             <option value="3">High</option>
                                         </select>
                                     </td>
@@ -572,7 +589,7 @@ $(document).ready(function() {
                                     <td>
                                         <select id="tmpr_powerup_list">
                                             <option value="0">Off</option>
-                                            <option value="1">On</option>
+                                            <option value="1" selected>On</option>
                                         </select>
                                     </td>
                                 </tr>
