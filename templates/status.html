@@ -18,14 +18,20 @@
 <html>
 <head>
 <title>Hello, {% if master_mind %}Master{% else %}World{% endif %}</title>
-<script type=text/javascript src="{{url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
-<link rel="stylesheet" href="{{url_for('static', filename='main.css') }}">
-<script src="{{url_for('static', filename='jokes.js') }}"></script>
-<script src="{{url_for('static', filename='amcharts/amcharts.js') }}"></script>
-<script src="{{url_for('static', filename='amcharts/serial.js') }}"></script>
-<script src="{{url_for('static', filename='amcharts/plugins/export/export.min.js') }}"></script>
-<link rel="stylesheet" href="{{url_for('static', filename='amcharts/plugins/export/export.css') }}" type="text/css" media="all" />
-<script src="{{url_for('static', filename='amcharts/themes/light.js') }}"></script>
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<link rel="mask-icon" href="{{ url_for('static', filename='safari-pinned-tab.svg') }}" color="#5bbad5">
+<meta name="theme-color" content="#ffffff">
+<script type=text/javascript src="{{ url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+<script src="{{ url_for('static', filename='jokes.js') }}"></script>
+<script src="{{ url_for('static', filename='amcharts/amcharts.js') }}"></script>
+<script src="{{ url_for('static', filename='amcharts/serial.js') }}"></script>
+<script src="{{ url_for('static', filename='amcharts/plugins/export/export.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='amcharts/plugins/export/export.css') }}" type="text/css" media="all" />
+<script src="{{ url_for('static', filename='amcharts/themes/light.js') }}"></script>
 <script type=text/javascript>
 var chart = AmCharts.makeChart("chartdiv", {
   "type": "serial",
@@ -38,7 +44,9 @@ var chart = AmCharts.makeChart("chartdiv", {
     "position": "left",
     "ignoreAxisWidth": true,
     "precision": 2,
-    "minPeriod": 0.01
+    "minPeriod": 0.01,
+    "includeAllValues": true,
+    "unit": "K"
   }],
   "balloon": {
     "borderThickness": 1,
@@ -87,7 +95,7 @@ var chart = AmCharts.makeChart("chartdiv", {
   },
   "valueScrollbar": {
     "oppositeAxis": false,
-    "offset": 64,
+    "offset": 78,
     "scrollbarHeight": 10
   },
   "categoryField": "time",
@@ -105,7 +113,7 @@ var chart = AmCharts.makeChart("chartdiv", {
   "export": {
     "enabled": true,
     "libs": {
-      "path": "{{url_for('static', filename='amcharts/plugins/export/libs/') }}"
+      "path": "{{ url_for('static', filename='amcharts/plugins/export/libs/') }}"
     },
     "menu": [{
     "class": "export-main",
@@ -243,7 +251,7 @@ function update_values() {
             {%- endif %}
 /******************************************************************************/
             var dict = {};
-            var tmpr_ok = true;
+            var tmpr_in_ok = false, tmpr_out_ok = false;
             if (data.tmpr_temperatures != null) {
                 for (var i = 0; i < 2; ++i) {
                     dict["time"] = new Date();
@@ -253,17 +261,19 @@ function update_values() {
                             $("#tmpr_temperature" + (i+1)).text(data.tmpr_temperatures[i]);
                             var key = "temperature" + (i+1);
                             dict[key] = data.tmpr_temperatures[i];
+                            tmpr_in_ok = true;
+                            $($("select#tmpr_input_list option")[i+1]).show();
                     }
                     else {
                         $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
-                        tmpr_ok = false;
+                        $($("select#tmpr_input_list option")[i+1]).hide();
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
-                    tmpr_ok = false;
+                    $($("select#tmpr_input_list option")[i+1]).hide();
                 }
                 dict = {};
             }
@@ -290,7 +300,6 @@ function update_values() {
                 chart.ignoreZoomed = true;
                 chart.validateData();
             }
-            $("#time").text(new Date().toLocaleTimeString());
 
             if (data.tmpr_output != null) {
                 for (var i = 0; i < 2; ++i) {
@@ -299,27 +308,31 @@ function update_values() {
                         data.tmpr_output[i] != null) {
                             $("#tmpr_output" + (i+1)).text(data.tmpr_output[i]);
                             var key = "output" + (i+1);
+                            tmpr_out_ok = true;
+                            $($("select#tmpr_output_list option")[i]).show();
                     }
                     else {
                         $("#tmpr_output" + (i+1)).html("<b>??</b>");
-                        tmpr_ok = false;
+                        $($("select#tmpr_output_list option")[i]).hide();
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_output" + (i+1)).html("<b>??</b>");
-                    tmpr_ok = false;
+                    $($("select#tmpr_output_list option")[i]).hide();
                 }
             }
             {% if master_mind -%}
-                if (tmpr_ok) {
+                if (tmpr_in_ok && tmpr_out_ok) {
                     $("table#tmpr_pid").show();
                 }
                 else {
                     $("table#tmpr_pid").hide();
                 }
             {%- endif %}
+
+            $("#time").text(new Date().toLocaleTimeString());
         });
 }
 setInterval(update_values, 1000)
@@ -360,8 +373,16 @@ $(document).ready(function() {
     $("input#tmpr_pid_on").click(function() {
         var output_list = $("select#tmpr_output_list")[0];
         var output = output_list.options[output_list.selectedIndex].value;
+        if ($($("select#tmpr_output_list option")[output_list.selectedIndex]).is(':hidden')) {
+            alert("Invalid output");
+            return;
+        }
         var input_list = $("select#tmpr_input_list")[0];
         var input = input_list.options[input_list.selectedIndex].value;
+        if ($($("select#tmpr_input_list option")[input_list.selectedIndex]).is(':hidden')) {
+            alert("Invalid input");
+            return;
+        }
         var pid_mode_list = $("select#tmpr_pid_mode_list")[0];
         var pid_mode = pid_mode_list.options[pid_mode_list.selectedIndex].value;
         var powerup_list = $("select#tmpr_powerup_list")[0];

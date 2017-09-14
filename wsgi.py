@@ -66,6 +66,11 @@ if not app.debug:
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/')
 def index():
     return render_template('status.html',
@@ -390,22 +395,22 @@ class worker_tmpr(Thread):
                 if resp != None and len(resp) == 3:
                     r = int(resp)
                     if r >= 128:
-                        print("sensor units overrange for " + letter)
+                        app.logger.warning("sensor units overrange for " + letter)
                         r -= 128
                     if r >= 64:
-                        print("sensor units zero for " + letter)
+                        app.logger.warning("sensor units zero for " + letter)
                         r -= 64
                     if r >= 32:
-                        print("temp overrange for " + letter)
+                        app.logger.warning("temp overrange for " + letter)
                         r -= 32
                     if r >= 16:
-                        print("temp underrange for " + letter)
+                        app.logger.warning("temp underrange for " + letter)
                         r -= 16
                     if r >= 1:
-                        print("invalid reading for " + letter)
+                        app.logger.warning("invalid reading for " + letter)
                         r -= 1
                     if r > 0:
-                        print("unknown temperature reading error for " + letter)
+                        app.logger.warning("unknown temperature reading error for " + letter)
         return
     def read_output(self):
         for index, letter in zip([0, 1], ['1', '2']):
@@ -429,11 +434,11 @@ class worker_tmpr(Thread):
                 if resp != None and len(resp) > 0:
                     r = int(resp)
                     if r == 1:
-                        print("heater open load for " + letter)
+                        app.logger.warning("heater open load for " + letter)
                     elif r == 2:
-                        print("heater short for " + letter)
+                        app.logger.warning("heater short for " + letter)
                     else:
-                        print("unknown output state reading error for " + letter)
+                        app.logger.warning("unknown output state reading error for " + letter)
         return
     def read(self, cmd, payload):
         resp = None
