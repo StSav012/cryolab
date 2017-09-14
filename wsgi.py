@@ -14,6 +14,7 @@ import crcmod.predefined
 from IPy import IP
 from subprocess import Popen, PIPE
 from collections import Iterable
+import requests
 
 def get_mac(ip):
     mac = None
@@ -128,6 +129,15 @@ def tmpr_do():
         else:
             return "Commands failed"
     return "Permission denied"
+
+@app.route('/jokes', methods = ['GET'])
+def joke():
+    url = 'http://www.laughfactory.com/joke/loadmorejokes';
+    try:
+        r = requests.get(url, params=request.args, timeout=1)
+        return r.text
+    except:
+        return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
 
 class worker_cmpr(Thread):
     crc16 = crcmod.predefined.Crc('modbus')

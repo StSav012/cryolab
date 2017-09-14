@@ -20,6 +20,7 @@
 <title>Hello, {% if master_mind %}Master{% else %}World{% endif %}</title>
 <script type=text/javascript src="{{url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
 <link rel="stylesheet" href="{{url_for('static', filename='main.css') }}">
+<script src="{{url_for('static', filename='jokes.js') }}"></script>
 <script src="{{url_for('static', filename='amcharts/amcharts.js') }}"></script>
 <script src="{{url_for('static', filename='amcharts/serial.js') }}"></script>
 <script src="{{url_for('static', filename='amcharts/plugins/export/export.min.js') }}"></script>
@@ -635,6 +636,7 @@ $(document).ready(function() {
 </tr>
 </table>
 
-<p id="time"></p>
+<p id="time" onclick="loadJoke('#time + div');"></p>
+<div style="white-space: pre-line;"></div>
 </body>
 </html>
