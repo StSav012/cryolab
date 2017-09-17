@@ -199,9 +199,6 @@ button.error.off:disabled {
     color: gray;
     background-color: #221111;
 }
-table#tmpr_pid {
-    display: none;
-}
 #chartdiv {
   min-width: 500px;
   height: 500px;

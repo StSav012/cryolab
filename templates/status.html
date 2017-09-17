@@ -251,7 +251,7 @@ function update_values() {
             {%- endif %}
 /******************************************************************************/
             var dict = {};
-            var tmpr_in_ok = false, tmpr_out_ok = false;
+            var tmpr_in_ok = false;
             if (data.tmpr_temperatures != null) {
                 for (var i = 0; i < 2; ++i) {
                     dict["time"] = new Date();
@@ -262,18 +262,24 @@ function update_values() {
                             var key = "temperature" + (i+1);
                             dict[key] = data.tmpr_temperatures[i];
                             tmpr_in_ok = true;
-                            $($("select#tmpr_input_list option")[i+1]).show();
+                            {% if master_mind -%}
+                                $($("select#tmpr_input_list option")[i+1]).show();
+                            {%- endif %}
                     }
                     else {
                         $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
-                        $($("select#tmpr_input_list option")[i+1]).hide();
+                        {% if master_mind -%}
+                            $($("select#tmpr_input_list option")[i+1]).hide();
+                        {%- endif %}
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_temperature" + (i+1)).html("<b>??</b>");
-                    $($("select#tmpr_input_list option")[i+1]).hide();
+                    {% if master_mind -%}
+                        $($("select#tmpr_input_list option")[i+1]).hide();
+                    {%- endif %}
                 }
                 dict = {};
             }
@@ -308,29 +314,26 @@ function update_values() {
                         data.tmpr_output[i] != null) {
                             $("#tmpr_output" + (i+1)).text(data.tmpr_output[i]);
                             var key = "output" + (i+1);
-                            tmpr_out_ok = true;
-                            $($("select#tmpr_output_list option")[i]).show();
+                            {% if master_mind -%}
+                                $($("table#tmpr_pid_ch")[i]).show();
+                            {%- endif %}
                     }
                     else {
                         $("#tmpr_output" + (i+1)).html("<b>??</b>");
-                        $($("select#tmpr_output_list option")[i]).hide();
+                        {% if master_mind -%}
+                            $($("table#tmpr_pid_ch")[i]).hide();
+                        {%- endif %}
                     }
                 }
             }
             else {
                 for (var i = 0; i < 2; ++i) {
                     $("#tmpr_output" + (i+1)).html("<b>??</b>");
-                    $($("select#tmpr_output_list option")[i]).hide();
+                    {% if master_mind -%}
+                        $($("table#tmpr_pid_ch")[i]).hide();
+                    {%- endif %}
                 }
             }
-            {% if master_mind -%}
-                if (tmpr_in_ok && tmpr_out_ok) {
-                    $("table#tmpr_pid").show();
-                }
-                else {
-                    $("table#tmpr_pid").hide();
-                }
-            {%- endif %}
 
             $("#time").text(new Date().toLocaleTimeString());
         });
@@ -369,120 +372,114 @@ $(document).ready(function() {
 });
 </script>
 <script type=text/javascript>
-$(document).ready(function() {
-    $("input#tmpr_pid_on").click(function() {
-        var output_list = $("select#tmpr_output_list")[0];
-        var output = output_list.options[output_list.selectedIndex].value;
-        if ($($("select#tmpr_output_list option")[output_list.selectedIndex]).is(':hidden')) {
-            alert("Invalid output");
-            return;
-        }
-        var input_list = $("select#tmpr_input_list")[0];
-        var input = input_list.options[input_list.selectedIndex].value;
-        if ($($("select#tmpr_input_list option")[input_list.selectedIndex]).is(':hidden')) {
-            alert("Invalid input");
-            return;
-        }
-        var pid_mode_list = $("select#tmpr_pid_mode_list")[0];
-        var pid_mode = pid_mode_list.options[pid_mode_list.selectedIndex].value;
-        var powerup_list = $("select#tmpr_powerup_list")[0];
-        var powerup = powerup_list.options[powerup_list.selectedIndex].value;
-        var pid_range_list = $("select#tmpr_pid_range_list")[0];
-        var pid_range = pid_range_list.options[pid_range_list.selectedIndex].value;
-        var pid_value_field = $("input#tmpr_pid_value_field")[0];
-        var pid_value = pid_value_field.value;
-        var pid_p_field = $("input#tmpr_pid_p_field")[0];
-        var pid_p = pid_p_field.value;
-        var pid_i_field = $("input#tmpr_pid_i_field")[0];
-        var pid_i = pid_i_field.value;
-        var pid_d_field = $("input#tmpr_pid_d_field")[0];
-        var pid_d = pid_d_field.value;
-        $.ajax({
-            type: 'post',
-            url: 'tmpr_do',
-            contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({
-              cmds:
+function tmpr_pid_on(output) {
+    if ($($("table#tmpr_pid_ch" + output)[0]).is(':hidden')) {
+        alert("Invalid output");
+        return;
+    }
+    var input_list = $("table#tmpr_pid_ch" + output + " select#tmpr_input_list")[0];
+    var input = input_list.options[input_list.selectedIndex].value;
+    if ($($("table#tmpr_pid_ch" + output + " select#tmpr_input_list option")[input_list.selectedIndex]).is(':hidden')) {
+        alert("Invalid input");
+        return;
+    }
+    var pid_mode_list = $("table#tmpr_pid_ch" + output + " select#tmpr_pid_mode_list")[0];
+    var pid_mode = pid_mode_list.options[pid_mode_list.selectedIndex].value;
+    var powerup_list = $("table#tmpr_pid_ch" + output + " select#tmpr_powerup_list")[0];
+    var powerup = powerup_list.options[powerup_list.selectedIndex].value;
+    var pid_range_list = $("table#tmpr_pid_ch" + output + " select#tmpr_pid_range_list")[0];
+    var pid_range = pid_range_list.options[pid_range_list.selectedIndex].value;
+    var pid_value_field = $("table#tmpr_pid_ch" + output + " input#tmpr_pid_value_field")[0];
+    var pid_value = pid_value_field.value;
+    var pid_p_field = $("table#tmpr_pid_ch" + output + " input#tmpr_pid_p_field")[0];
+    var pid_p = pid_p_field.value;
+    var pid_i_field = $("table#tmpr_pid_ch" + output + " input#tmpr_pid_i_field")[0];
+    var pid_i = pid_i_field.value;
+    var pid_d_field = $("table#tmpr_pid_ch" + output + " input#tmpr_pid_d_field")[0];
+    var pid_d = pid_d_field.value;
+    $.ajax({
+        type: 'post',
+        url: 'tmpr_do',
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+          cmds:
+          [
+            {
+              cmd: "outmode",
+              payload:
               [
-                {
-                  cmd: "outmode",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* mode:           */   pid_mode,   // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
-                    /* input:          */   input,      // 0 = None, 1 = A, 2 = B
-                    /* powerup_enable: */   powerup     // 0 = Off, 1 = On
-                  ]
-                },
-                {
-                  cmd: "pid",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* P:              */   pid_p,      // Proportional (gain)
-                    /* I:              */   pid_i,      // Integral (reset)
-                    /* D:              */   pid_d       // Derivative (rate)
-                  ]
-                },
-                {
-                  cmd: "setp",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* value:          */   pid_value   // respect the sensor units!
-                  ]
-                },
-                {
-                  cmd: "range",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* range:          */   pid_range   // 0 = Off, 1 = Low, 2 = Medium, 3 = High
-                  ]
-                }
+                /* output:         */   output,     // 1 or 2
+                /* mode:           */   pid_mode,   // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
+                /* input:          */   input,      // 0 = None, 1 = A, 2 = B
+                /* powerup_enable: */   powerup     // 0 = Off, 1 = On
               ]
-            }),
-            success: function(data, status) {
-                alert("Data: " + data + "\nStatus: " + status);
-            }
-        });
-    });
-    $("input#tmpr_pid_off").click(function(){
-        var output_list = $("select#tmpr_output_list")[0];
-        var output = output_list.options[output_list.selectedIndex].value;
-        $.ajax({
-            type: 'post',
-            url: 'tmpr_do',
-            contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({
-              cmds:
+            },
+            {
+              cmd: "pid",
+              payload:
               [
-                {
-                  cmd: "outmode",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* mode:           */   0,          // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
-                    /* input:          */   0,          // 0 = None, 1 = A, 2 = B
-                    /* powerup_enable: */   0           // 0 = Off, 1 = On
-                  ]
-                },
-                {
-                  cmd: "range",
-                  payload:
-                  [
-                    /* output:         */   output,     // 1 or 2
-                    /* range:          */   0           // 0 = Off, 1 = Low, 2 = Medium, 3 = High
-                  ]
-                }
+                /* output:         */   output,     // 1 or 2
+                /* P:              */   pid_p,      // Proportional (gain)
+                /* I:              */   pid_i,      // Integral (reset)
+                /* D:              */   pid_d       // Derivative (rate)
               ]
-            }),
-            success: function(data, status) {
-                alert("Data: " + data + "\nStatus: " + status);
+            },
+            {
+              cmd: "setp",
+              payload:
+              [
+                /* output:         */   output,     // 1 or 2
+                /* value:          */   pid_value   // respect the sensor units!
+              ]
+            },
+            {
+              cmd: "range",
+              payload:
+              [
+                /* output:         */   output,     // 1 or 2
+                /* range:          */   pid_range   // 0 = Off, 1 = Low, 2 = Medium, 3 = High
+              ]
             }
-        });
+          ]
+        }),
+        success: function(data, status) {
+            alert("Data: " + data + "\nStatus: " + status);
+        }
     });
-});
+}
+function tmpr_pid_off(output) {
+    $.ajax({
+        type: 'post',
+        url: 'tmpr_do',
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+          cmds:
+          [
+            {
+              cmd: "outmode",
+              payload:
+              [
+                /* output:         */   output,     // 1 or 2
+                /* mode:           */   0,          // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
+                /* input:          */   0,          // 0 = None, 1 = A, 2 = B
+                /* powerup_enable: */   0           // 0 = Off, 1 = On
+              ]
+            },
+            {
+              cmd: "range",
+              payload:
+              [
+                /* output:         */   output,     // 1 or 2
+                /* range:          */   0           // 0 = Off, 1 = Low, 2 = Medium, 3 = High
+              ]
+            }
+          ]
+        }),
+        success: function(data, status) {
+            alert("Data: " + data + "\nStatus: " + status);
+        }
+    });
+}
 </script>
 {%- endif %}
 </head>
@@ -561,14 +558,11 @@ $(document).ready(function() {
                 <table class="wide" id="tmpr_pid">
                     <tr>
                         <td>
-                            <table class="wide">
+                            <table class="wide" id="tmpr_pid_ch1">
                                 <tr>
                                     <td>Output:</td>
                                     <td>
-                                        <select id="tmpr_output_list">
-                                            <option value="1">1</option>
-                                            <option value="2">2</option>
-                                        </select>
+                                        <b>1</b>
                                     </td>
                                 </tr>
                                 <tr>
@@ -638,11 +632,96 @@ $(document).ready(function() {
                                         <input type='number' id="tmpr_pid_d_field" value="0" step="any"/>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td class="align_center" colspan=2>
+                                        <input type="button" class="action_button" onclick="tmpr_pid_on(1)" value="Turn PID on!">
+                                        <input type="button" class="action_button" onclick="tmpr_pid_off(1)" value="Turn PID off!">
+                                    </td>
+                                </tr>
                             </table>
                         </td>
-                        <td class="align_center">
-                            <input type="button" class="action_button" id="tmpr_pid_on" value="Turn PID on!">
-                            <input type="button" class="action_button" id="tmpr_pid_off" value="Turn PID off!">
+                        <td>
+                            <table class="wide" id="tmpr_pid_ch2">
+                                <tr>
+                                    <td>Output:</td>
+                                    <td>
+                                        <b>2</b>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Input:</td>
+                                    <td>
+                                        <select id="tmpr_input_list">
+                                            <option value="0">None</option>
+                                            <option value="1">A</option>
+                                            <option value="2" selected>B</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Mode:</td>
+                                    <td>
+                                        <select id="tmpr_pid_mode_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>Closed Loop PID</option>
+                                            <option value="2">Zone</option>
+                                            <option value="3">Open Loop</option>
+                                            <option value="4">Monitor Out</option>
+                                            <option value="5">Warmup Supply</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Range:</td>
+                                    <td>
+                                        <select id="tmpr_pid_range_list">
+                                            <option value="0">Off</option>
+                                            <option value="1">Low</option>
+                                            <option value="2" selected>Medium</option>
+                                            <option value="3">High</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Powerup:</td>
+                                    <td>
+                                        <select id="tmpr_powerup_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>On</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Desired value:</td>
+                                    <td>
+                                        <input type='number' id="tmpr_pid_value_field" value="292.73" step="0.01" min="0.00"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>P:</td>
+                                    <td>
+                                        <input type='number' id="tmpr_pid_p_field" value="50" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>I:</td>
+                                    <td>
+                                        <input type='number' id="tmpr_pid_i_field" value="20" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>D:</td>
+                                    <td>
+                                        <input type='number' id="tmpr_pid_d_field" value="0" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align_center" colspan=2>
+                                        <input type="button" class="action_button" onclick="tmpr_pid_on(2)" value="Turn PID on!">
+                                        <input type="button" class="action_button" onclick="tmpr_pid_off(2)" value="Turn PID off!">
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                 </table>
