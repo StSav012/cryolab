@@ -240,6 +240,9 @@ function update_values() {
                           'cmpr_system_on'] %}
                 if (data.{{ id }}) {
                     $($("button#{{ id }}")[0]).addClass("on").removeClass("off");
+                    if (("{{ id }}").endsWith("_alarm") || ("{{ id }}").endsWith("_off")) {
+                        $($("audio#warning")[0]).play();
+                    }
                 }
                 else {
                     $($("button#{{ id }}")[0]).addClass("off").removeClass("on");
@@ -755,5 +758,10 @@ function tmpr_pid_off(output) {
 
 <p id="time" onclick="loadJoke('#time + div');"></p>
 <div style="white-space: pre-line;"></div>
+
+<audio preload="auto" id="warning">
+  <source src="{{ url_for('static', filename='horse.ogg') }}" type="audio/ogg">
+  <source src="{{ url_for('static', filename='horse.mp3') }}" type="audio/mpeg">
+</audio>
 </body>
 </html>
