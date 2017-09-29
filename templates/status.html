@@ -15,6 +15,19 @@
 var timePeriod = 1000;
 function update_values() {
     $("#time").text(new Date().toLocaleTimeString());
+
+    // https://stackoverflow.com/a/819455
+    var iframes = document.querySelectorAll("iframe");
+    for (var i = 0; i < iframes.length; ++i) {
+        var iframe = iframes[i];
+        if (iframe &&
+            iframe.contentWindow &&
+            iframe.contentWindow.document &&
+            iframe.contentWindow.document.body &&
+            iframe.contentWindow.document.body.scrollHeight) {
+            iframe.height = iframe.contentWindow.document.body.scrollHeight + 20;   // FIXME: ugly hack
+        }
+    }
 }
 setInterval(update_values, timePeriod);
 </script>

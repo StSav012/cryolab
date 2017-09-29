@@ -119,6 +119,48 @@ def stuff():
                    tmpr_temperatures = tmpr.temperatures,
                    tmpr_output = tmpr.output)
 
+@app.route('/helium_compressor')
+def cmpr_index():
+    return render_template('cmpr.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           pressures = cmpr.pressures,
+                           temperatures = cmpr.temperatures,
+                           config_mode = cmpr.config_mode,
+                           local_on = cmpr.local_on,
+                           cold_head_run = cmpr.cold_head_run,
+                           cold_head_pause = cmpr.cold_head_pause,
+                           fault_off = cmpr.fault_off,
+                           oil_fault_off = cmpr.oil_fault_off,
+                           solenoid_on = cmpr.solenoid_on,
+                           pressure_off = cmpr.pressure_off,
+                           oil_level_alarm = cmpr.oil_level_alarm,
+                           water_flow_alarm = cmpr.water_flow_alarm,
+                           water_temperature_alarm = cmpr.water_temperature_alarm,
+                           helium_temperature_off = cmpr.helium_temperature_off,
+                           mains_off = cmpr.mains_off,
+                           motor_temperature_off = cmpr.motor_temperature_off,
+                           system_on = cmpr.system_on)
+
+@app.route('/helium_compressor/json', methods= ['GET'])
+def cmpr_json():
+    return jsonify(pressures = cmpr.pressures,
+                   temperatures = cmpr.temperatures,
+                   config_mode = cmpr.config_mode,
+                   local_on = cmpr.local_on,
+                   cold_head_run = cmpr.cold_head_run,
+                   cold_head_pause = cmpr.cold_head_pause,
+                   fault_off = cmpr.fault_off,
+                   oil_fault_off = cmpr.oil_fault_off,
+                   solenoid_on = cmpr.solenoid_on,
+                   pressure_off = cmpr.pressure_off,
+                   oil_level_alarm = cmpr.oil_level_alarm,
+                   water_flow_alarm = cmpr.water_flow_alarm,
+                   water_temperature_alarm = cmpr.water_temperature_alarm,
+                   helium_temperature_off = cmpr.helium_temperature_off,
+                   mains_off = cmpr.mains_off,
+                   motor_temperature_off = cmpr.motor_temperature_off,
+                   system_on = cmpr.system_on)
+
 @app.route('/cmpr_do', methods = ['POST'])
 def cmpr_do():
     if get_mac(request.remote_addr) in masters_list:
@@ -127,6 +169,18 @@ def cmpr_do():
         else:
             return "Command " + request.form['cmd'] + " failed"
     return "Permission denied"
+
+@app.route('/temperature_controller')
+def tmpr_index():
+    return render_template('tmpr.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           temperatures = tmpr.temperatures,
+                           output = tmpr.output)
+
+@app.route('/temperature_controller/json', methods= ['GET'])
+def tmpr_json():
+    return jsonify(temperatures = tmpr.temperatures,
+                   output = tmpr.output)
 
 @app.route('/tmpr_do', methods = ['POST'])
 def tmpr_do():
