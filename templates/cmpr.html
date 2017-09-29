@@ -142,8 +142,8 @@ $(document).ready(function() {
         <td>
             <table id='light'>
                 <tr>
-                    <td colspan=2>{{ light_button(title='System On', id='system_on', type='state', value=system_on) }}</td>
-                    <td colspan=2>{{ light_button(title='Local On', id='local_on', type='state', value=local_on) }}</td>
+                    <td colspan="2">{{ light_button(title='System On', id='system_on', type='state', value=system_on) }}</td>
+                    <td colspan="2">{{ light_button(title='Local On', id='local_on', type='state', value=local_on) }}</td>
                 </tr>
                 <tr>
                     <td>{{ light_button(title='Fault Off', id='fault_off', type='error', value=fault_off) }}</td>
@@ -168,7 +168,7 @@ $(document).ready(function() {
     </tr>
 {% if master_mind -%}
     <tr>
-        <td class="align_center" colspan=3>
+        <td class="align_center" colspan="2">
             <input type="button" class="action_button" id="on" value="Turn compressor on!" disabled>
             <input type="button" class="action_button" id="off" value="Turn compressor off!" disabled>
         </td>
