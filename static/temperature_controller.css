@@ -1,0 +1,160 @@
+html, body {
+    font-family: sans-serif;
+}
+
+input.action_button {
+    display: inline-block;
+    text-decoration: none;
+    font-weight: bold;
+    min-height: 2em;
+    background: darkred;
+    color: white;
+    border: none;
+    border-radius: 1em;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+    cursor: pointer;
+}
+
+input.action_button:disabled {
+    color: gray;
+    background-color: dimgray;
+    text-shadow: none;
+}
+
+input.action_button:active {
+    background-color: maroon;
+}
+
+select, input[type='number'] {
+    width: 100%;
+    /*display: inline-block;*/
+    text-decoration: none;
+    font-weight: bold;
+    color: white;
+    border: none;
+    border-radius: 0.5em;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+}
+select {
+    background-color: transparent;
+    background-image: linear-gradient(0deg, darkblue, darkblue);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    /*padding-left: 10px;*/
+    /*padding-right: 10px;*/
+}
+input[type='number'] {
+    background-color: darkblue;
+    appearance: textfield;
+    -webkit-appearance: textfield;
+    -moz-appearance: textfield;
+    padding-inline-start: 0.25rem;
+    padding-inline-end: 0.25rem;
+    width: calc(100% - 0.5rem);
+}
+select:focus option {
+    text-decoration: none;
+    font-weight: bold;
+    border: none;
+    border-radius: 0.5rem;
+    background-color: darkblue;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+}
+
+table.state {
+    width: 100%;
+}
+
+table.centered {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+table.wide {
+    width: 100%;
+}
+
+table.fixed {
+    table-layout: fixed;
+}
+
+table.state > tr > td {
+    padding: 5pt;
+    border-radius: 14pt;
+    color: white;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.align_center {
+    text-align: center;
+}
+
+.align_right {
+    text-align: right;
+}
+
+.align_justify {
+    text-align: justify;
+}
+
+td.large {
+    font-size: x-large;
+}
+
+#chartdiv {
+  min-width: 500px;
+  height: 500px;
+}
+/*
+td {
+    border: solid white 1px;
+}
+*/
+input#discard_data {
+    display: none;
+}
+input#discard_data + label {
+    font-size: 12pt;
+    text-decoration: none;
+    font-weight: bold;
+    background: darkgreen;
+    color: white;
+    border: none;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+    cursor: pointer;
+    border-radius: 0.5rem;
+    padding-inline-start: 0.25rem;
+    padding-inline-end: 0.25rem;
+    padding: 0.25rem;
+}
+input#discard_data:checked + label {
+    background-color: lightgreen;
+    color: grey;
+}
+
+input#clear {
+    font-size: 12pt;
+    text-decoration: none;
+    font-weight: bold;
+    background: darkred;
+    color: white;
+    border: none;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+    cursor: pointer;
+    border-radius: 0.5rem;
+    padding-inline-start: 0.25rem;
+    padding-inline-end: 0.25rem;
+    padding: 0.25rem;
+}
+
+input#clear:active {
+    background-color: maroon;
+}
+
