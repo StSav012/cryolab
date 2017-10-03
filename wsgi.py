@@ -206,6 +206,7 @@ class worker_cmpr(Thread):
         Thread.__init__(self)
         self.daemon = True
         self.ser = serial.Serial()
+        self.communicating = False
         self.temperatures = [None, None, None, None]
         self.pressures = [None, None]
         self.config_mode = None
@@ -245,6 +246,7 @@ class worker_cmpr(Thread):
     def read_temperatures(self):
         cmd = "$TEA"
         while self.ser.is_open:
+            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -265,14 +267,17 @@ class worker_cmpr(Thread):
             if len(resp) != 6 or resp[0] != cmd:
                 self.temperatures = [None, None, None, None]
                 print('wrong response: ' + c.decode("ascii"))
+                self.communicating = False
                 return False
             crc = self.crc16.new(c[:21])
             if crc.hexdigest() != resp[-1][:4]:
                 self.temperatures = [None, None, None, None]
                 print('wrong crc: ' + c.decode("ascii"))
+                self.communicating = False
                 return False
             for i in range(len(self.temperatures)):
                 self.temperatures[i] = int(resp[i+1])
+            self.communicating = False
             break
         else:
             self.open_serial()
@@ -280,6 +285,7 @@ class worker_cmpr(Thread):
     def read_pressures(self):
         cmd = "$PRA"
         while self.ser.is_open:
+            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -299,13 +305,16 @@ class worker_cmpr(Thread):
                 continue
             if len(resp) != 4 or resp[0] != cmd:
                 self.pressures = [None, None]
+                self.communicating = False
                 return False
             crc = self.crc16.new(c[:13])
             if crc.hexdigest() != resp[-1][:4]:
                 self.pressures = [None, None]
+                self.communicating = False
                 return False
             for i in range(len(self.pressures)):
                 self.pressures[i] = int(resp[i+1])
+            self.communicating = False
             break
         else:
             self.open_serial()
@@ -313,6 +322,7 @@ class worker_cmpr(Thread):
     def read_status(self):
         cmd = "$STA"
         while self.ser.is_open:
+            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -332,10 +342,12 @@ class worker_cmpr(Thread):
                 continue
             if len(resp) != 3 or resp[0] != cmd:
                 self.pressures = [None, None]
+                self.communicating = False
                 return False
             crc = self.crc16.new(c[:10])
             if crc.hexdigest() != resp[-1][:4]:
                 self.pressures = [None, None]
+                self.communicating = False
                 return False
             # normally resp[1] == "0301"
             state = hex2bits(resp[1])
@@ -355,12 +367,16 @@ class worker_cmpr(Thread):
             self.mains_off = bool(state[2])
             self.motor_temperature_off = bool(state[1])
             self.system_on = bool(state[0])
+            self.communicating = False
             break
         else:
             self.open_serial()
         return True
     def do(self, cmd):
+        if self.communicating:
+            print("compressor is busy")
         while self.ser.is_open:
+            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -379,10 +395,13 @@ class worker_cmpr(Thread):
             if resp[0] == "$???":
                 continue
             if len(resp) != 2 or resp[0] != cmd:
+                self.communicating = False
                 return False
             crc = self.crc16.new(c[:5])
             if crc.hexdigest() != resp[-1][:4]:
+                self.communicating = False
                 return False
+            self.communicating = False
             break
         else:
             self.open_serial()
