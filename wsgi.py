@@ -246,7 +246,6 @@ class worker_cmpr(Thread):
     def read_temperatures(self):
         cmd = "$TEA"
         while self.ser.is_open:
-            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -267,17 +266,14 @@ class worker_cmpr(Thread):
             if len(resp) != 6 or resp[0] != cmd:
                 self.temperatures = [None, None, None, None]
                 print('wrong response: ' + c.decode("ascii"))
-                self.communicating = False
                 return False
             crc = self.crc16.new(c[:21])
             if crc.hexdigest() != resp[-1][:4]:
                 self.temperatures = [None, None, None, None]
                 print('wrong crc: ' + c.decode("ascii"))
-                self.communicating = False
                 return False
             for i in range(len(self.temperatures)):
                 self.temperatures[i] = int(resp[i+1])
-            self.communicating = False
             break
         else:
             self.open_serial()
@@ -285,7 +281,6 @@ class worker_cmpr(Thread):
     def read_pressures(self):
         cmd = "$PRA"
         while self.ser.is_open:
-            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -305,16 +300,13 @@ class worker_cmpr(Thread):
                 continue
             if len(resp) != 4 or resp[0] != cmd:
                 self.pressures = [None, None]
-                self.communicating = False
                 return False
             crc = self.crc16.new(c[:13])
             if crc.hexdigest() != resp[-1][:4]:
                 self.pressures = [None, None]
-                self.communicating = False
                 return False
             for i in range(len(self.pressures)):
                 self.pressures[i] = int(resp[i+1])
-            self.communicating = False
             break
         else:
             self.open_serial()
@@ -322,7 +314,6 @@ class worker_cmpr(Thread):
     def read_status(self):
         cmd = "$STA"
         while self.ser.is_open:
-            self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
@@ -342,12 +333,10 @@ class worker_cmpr(Thread):
                 continue
             if len(resp) != 3 or resp[0] != cmd:
                 self.pressures = [None, None]
-                self.communicating = False
                 return False
             crc = self.crc16.new(c[:10])
             if crc.hexdigest() != resp[-1][:4]:
                 self.pressures = [None, None]
-                self.communicating = False
                 return False
             # normally resp[1] == "0301"
             state = hex2bits(resp[1])
@@ -367,14 +356,18 @@ class worker_cmpr(Thread):
             self.mains_off = bool(state[2])
             self.motor_temperature_off = bool(state[1])
             self.system_on = bool(state[0])
-            self.communicating = False
             break
         else:
             self.open_serial()
         return True
     def do(self, cmd):
-        if self.communicating:
-            print("compressor is busy")
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("compressor is very busy")
+                return False
         while self.ser.is_open:
             self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
@@ -405,15 +398,19 @@ class worker_cmpr(Thread):
             break
         else:
             self.open_serial()
+        self.communicating = False
         return True
     def run(self):
         while True:
             try:
+                self.communicating = True
                 self.read_temperatures()
                 self.read_pressures()
                 self.read_status()
+                self.communicating = False
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
+                self.communicating = False
                 worker_cmpr().stop()
                 sys.exit(0)
 
@@ -422,6 +419,7 @@ class worker_tmpr(Thread):
         Thread.__init__(self)
         self.daemon = True
         self.ser = serial.Serial()
+        self.communicating = False
         self.temperatures = [None, None]
         self.output = [None, None]
         self.open_serial()
@@ -537,6 +535,13 @@ class worker_tmpr(Thread):
             self.open_serial()
         return resp
     def do(self, cmds):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("temperature controller is very busy")
+                return False
         if self.ser.is_open:
             if isinstance(cmds, Iterable):
                 for cmd in cmds:
@@ -547,7 +552,7 @@ class worker_tmpr(Thread):
                         else:
                             msg += ','
                         msg += str(item)
-                    print(msg)
+                    # print(msg)
                     msg += '\n'
                     try:
                         self.ser.write(msg.encode('ascii'))
@@ -555,21 +560,28 @@ class worker_tmpr(Thread):
                     except:
                         self.ser.close()
                         self.open_serial()
+                        self.communicating = False
                         return False
             else:
-                print("not iterable")
+                print("commands are not iterable")
+                self.communicating = False
                 return False
         else:
             self.open_serial()
+            self.communicating = False
             return False
+        self.communicating = False
         return True
     def run(self):
         while True:
             try:
+                self.communicating = True
                 self.read_temperatures()
                 self.read_output()
+                self.communicating = False
                 time.sleep(0.25)
             except (KeyboardInterrupt, SystemExit):
+                self.communicating = False
                 worker_tmpr().stop()
                 sys.exit(0)
 
