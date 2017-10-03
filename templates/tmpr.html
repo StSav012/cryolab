@@ -14,7 +14,7 @@
 <!doctype html>
 <html>
 <head>
-<title>Hello, {% if master_mind %}Master{% else %}World{% endif %}</title>
+<title>Hello, {% if master_mind %}Master{% else %}World{% endif %} — Temperature Controller</title>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
 <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
 <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
@@ -29,7 +29,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='amcharts/plugins/export/export.css') }}" type="text/css" media="all" />
 <script src="{{ url_for('static', filename='amcharts/themes/light.js') }}"></script>
 <script type=text/javascript>
-var chart = AmCharts.makeChart("chartdiv", {
+var chart = AmCharts.makeChart("chart", {
   "type": "serial",
   //"theme": "light",
   "marginRight": 40,
@@ -167,7 +167,7 @@ chart.addListener("zoomed", function(event) {
         chart.ignoreZoomed = false;
         return;
     }
-    chart.isZoomed = !(event.startIndex == 0 && event.chart.dataProvider.length - 1 == event.endIndex);
+    chart.isZoomed = (event.endIndex - event.startIndex < event.chart.dataProvider.length - 1);
     chart.zoomStart = event.startIndex;
     chart.zoomEnd = event.endIndex;
 });
@@ -176,8 +176,7 @@ chart.addListener("dataUpdated", function(event) {
     if (!chart.isZoomed) {
         return;
     }
-    var zoomRange = chart.zoomEnd - chart.zoomStart + 1;
-    chart.zoomToIndexes(event.chart.dataProvider.length - zoomRange, event.chart.dataProvider.length);
+    chart.zoomToIndexes(chart.zoomStart + 1, chart.zoomEnd + 2);
 });
 /******************************************************************************/
 var timePeriod = 250;
@@ -259,12 +258,11 @@ function update_values() {
                 chart.ignoreZoomed = true;
                 chart.validateData();
             }
-            if (plotData.length == 0) {
-                $("div#chartdiv").hide();
+            if (in_ok) {
+                $("input#discard_data + label").show();
             }
-            else if (plotData.length == 1) {        // to fire only once
-                $("div#chartdiv").show();
-                $("input#clear").show();
+            else {
+                $("input#discard_data + label").hide();
             }
 
             if (data.output != null) {
@@ -294,6 +292,13 @@ function update_values() {
                 }
             }
         });
+    if (plotData.length == 0) {
+        $("div#chart").hide();
+    }
+    else if (plotData.length == 1) {        // to fire only once
+        $("div#chart").show();
+        $("input#clear").show();
+    }
 }
 setInterval(update_values, timePeriod);
 $(document).ready(function() {
@@ -609,7 +614,7 @@ function pid_off(output) {
 {%- endif %}
     <tr>
         <td>
-            <div id="chartdiv"></div>
+            <div id="chart"></div>
         </td>
     </tr>
     <tr>
