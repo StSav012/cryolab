@@ -112,6 +112,11 @@ div#chart {
   display: none;
 }
 
+/* page resizing fix */
+div.amcharts-chart-div {
+  width: 100% !important;
+}
+
 table#pid_ch1, table#pid_ch2 {
   display: none;
 }

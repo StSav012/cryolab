@@ -391,7 +391,7 @@ function pid_on(output) {
 function pid_off(output) {
     $.ajax({
         type: 'post',
-        url: 'do',
+        url: 'tmpr_do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
           cmds:

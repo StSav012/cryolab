@@ -32,7 +32,7 @@ input.accordion:checked + label + iframe {
 /******************************************************************************/
 
 html, body {
-    background: #798F41;
+/*    background: #798F41;*/
     font-family: sans-serif;
 }
 
