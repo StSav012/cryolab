@@ -107,8 +107,8 @@ td.large {
 }
 
 div#chart {
-  min-width: 500px;
-  height: 500px;
+  min-width: 320px;
+  height: 480px;
   display: none;
 }
 
