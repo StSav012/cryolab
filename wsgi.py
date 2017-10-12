@@ -30,9 +30,10 @@ def get_mac(ip):
     return mac
 
 masters_list = ["00:13:77:AD:CD:39", "00:21:63:99:F6:83",
-                "D4:3D:7E:05:14:27",# anfertev
-                "00:24:1D:29:F4:F1",# rls
-                "00:21:91:54:80:76" # experiment
+                "D4:3D:7E:05:14:27", # anfertev
+                "00:24:1D:29:F4:F1", # rls
+                "00:21:91:54:80:76", # experiment
+                "D4:3D:7E:BF:46:C9"  # alp
                ]
 
 def hex2bits(hex_str):
@@ -528,6 +529,9 @@ class worker_tmpr(Thread):
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 resp = self.ser.readline().decode("ascii")[:-1]
+                if len(resp) == 0:
+                    self.ser.close()
+                    self.open_serial()
             except:
                 self.ser.close()
                 self.open_serial()
