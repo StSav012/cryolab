@@ -5,6 +5,7 @@ from flask import render_template
 from flask import jsonify
 from flask import request
 from flask import send_from_directory
+from flask import Response
 import os
 import serial
 import serial.tools.list_ports
@@ -36,6 +37,8 @@ masters_list = ["00:13:77:AD:CD:39", "00:21:63:99:F6:83",
                 "D4:3D:7E:BF:46:C9"  # alp
                ]
 
+is_realtime_measurement_running = False
+
 def hex2bits(hex_str):
     state = [0 for i in range(len(hex_str) * 4)];
     i = 0
@@ -55,151 +58,21 @@ def hex2bits(hex_str):
         i += 1
     return state
 
-app = Flask(__name__)
-app.debug = False
-if not app.debug:
-    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
-    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.WARNING)
-    log.addHandler(handler)
-    app.logger.addHandler(handler)
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
-
-@app.route('/')
-def index():
-    return render_template('status.html',
-                           master_mind = (get_mac(request.remote_addr) in masters_list),
-                           cmpr_pressures = cmpr.pressures,
-                           cmpr_temperatures = cmpr.temperatures,
-                           cmpr_config_mode = cmpr.config_mode,
-                           cmpr_local_on = cmpr.local_on,
-                           cmpr_cold_head_run = cmpr.cold_head_run,
-                           cmpr_cold_head_pause = cmpr.cold_head_pause,
-                           cmpr_fault_off = cmpr.fault_off,
-                           cmpr_oil_fault_off = cmpr.oil_fault_off,
-                           cmpr_solenoid_on = cmpr.solenoid_on,
-                           cmpr_pressure_off = cmpr.pressure_off,
-                           cmpr_oil_level_alarm = cmpr.oil_level_alarm,
-                           cmpr_water_flow_alarm = cmpr.water_flow_alarm,
-                           cmpr_water_temperature_alarm = cmpr.water_temperature_alarm,
-                           cmpr_helium_temperature_off = cmpr.helium_temperature_off,
-                           cmpr_mains_off = cmpr.mains_off,
-                           cmpr_motor_temperature_off = cmpr.motor_temperature_off,
-                           cmpr_system_on = cmpr.system_on,
-                           tmpr_temperatures = tmpr.temperatures,
-                           tmpr_output = tmpr.output)
-
-@app.route('/json', methods= ['GET'])
-def stuff():
-    return jsonify(cmpr_pressures = cmpr.pressures,
-                   cmpr_temperatures = cmpr.temperatures,
-                   cmpr_config_mode = cmpr.config_mode,
-                   cmpr_local_on = cmpr.local_on,
-                   cmpr_cold_head_run = cmpr.cold_head_run,
-                   cmpr_cold_head_pause = cmpr.cold_head_pause,
-                   cmpr_fault_off = cmpr.fault_off,
-                   cmpr_oil_fault_off = cmpr.oil_fault_off,
-                   cmpr_solenoid_on = cmpr.solenoid_on,
-                   cmpr_pressure_off = cmpr.pressure_off,
-                   cmpr_oil_level_alarm = cmpr.oil_level_alarm,
-                   cmpr_water_flow_alarm = cmpr.water_flow_alarm,
-                   cmpr_water_temperature_alarm = cmpr.water_temperature_alarm,
-                   cmpr_helium_temperature_off = cmpr.helium_temperature_off,
-                   cmpr_mains_off = cmpr.mains_off,
-                   cmpr_motor_temperature_off = cmpr.motor_temperature_off,
-                   cmpr_system_on = cmpr.system_on,
-                   tmpr_temperatures = tmpr.temperatures,
-                   tmpr_output = tmpr.output)
-
-@app.route('/helium_compressor')
-def cmpr_index():
-    return render_template('cmpr.html',
-                           master_mind = (get_mac(request.remote_addr) in masters_list),
-                           pressures = cmpr.pressures,
-                           temperatures = cmpr.temperatures,
-                           config_mode = cmpr.config_mode,
-                           local_on = cmpr.local_on,
-                           cold_head_run = cmpr.cold_head_run,
-                           cold_head_pause = cmpr.cold_head_pause,
-                           fault_off = cmpr.fault_off,
-                           oil_fault_off = cmpr.oil_fault_off,
-                           solenoid_on = cmpr.solenoid_on,
-                           pressure_off = cmpr.pressure_off,
-                           oil_level_alarm = cmpr.oil_level_alarm,
-                           water_flow_alarm = cmpr.water_flow_alarm,
-                           water_temperature_alarm = cmpr.water_temperature_alarm,
-                           helium_temperature_off = cmpr.helium_temperature_off,
-                           mains_off = cmpr.mains_off,
-                           motor_temperature_off = cmpr.motor_temperature_off,
-                           system_on = cmpr.system_on)
-
-@app.route('/helium_compressor/json', methods= ['GET'])
-def cmpr_json():
-    return jsonify(pressures = cmpr.pressures,
-                   temperatures = cmpr.temperatures,
-                   config_mode = cmpr.config_mode,
-                   local_on = cmpr.local_on,
-                   cold_head_run = cmpr.cold_head_run,
-                   cold_head_pause = cmpr.cold_head_pause,
-                   fault_off = cmpr.fault_off,
-                   oil_fault_off = cmpr.oil_fault_off,
-                   solenoid_on = cmpr.solenoid_on,
-                   pressure_off = cmpr.pressure_off,
-                   oil_level_alarm = cmpr.oil_level_alarm,
-                   water_flow_alarm = cmpr.water_flow_alarm,
-                   water_temperature_alarm = cmpr.water_temperature_alarm,
-                   helium_temperature_off = cmpr.helium_temperature_off,
-                   mains_off = cmpr.mains_off,
-                   motor_temperature_off = cmpr.motor_temperature_off,
-                   system_on = cmpr.system_on)
-
-@app.route('/cmpr_do', methods = ['POST'])
-def cmpr_do():
-    if get_mac(request.remote_addr) in masters_list:
-        if cmpr.do(request.form.get('cmd')):
-            return "Command " + request.form['cmd'] + " succeeded"
-        else:
-            return "Command " + request.form['cmd'] + " failed"
-    return "Permission denied"
-
-@app.route('/temperature_controller')
-def tmpr_index():
-    return render_template('tmpr.html',
-                           master_mind = (get_mac(request.remote_addr) in masters_list),
-                           temperatures = tmpr.temperatures,
-                           output = tmpr.output)
-
-@app.route('/temperature_controller/json', methods= ['GET'])
-def tmpr_json():
-    return jsonify(temperatures = tmpr.temperatures,
-                   output = tmpr.output)
-
-@app.route('/tmpr_do', methods = ['POST'])
-def tmpr_do():
-    if get_mac(request.remote_addr) in masters_list:
-        if tmpr.do(request.json.get('cmds')):
-            return "Commands succeeded"
-        else:
-            return "Commands failed"
-    return "Permission denied"
-
-@app.route('/jokes', methods = ['GET'])
-def joke():
-    url = 'http://www.laughfactory.com/joke/loadmorejokes';
-    try:
-        r = requests.get(url, params=request.args, timeout=1)
-        return r.text
-    except:
-        return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
+def csv(data, sep = '\t'):
+    s = ""
+    if isinstance(data, Iterable):
+        for line in data:
+            l = ""
+            if isinstance(line, dict):
+                for key, value in line.items():
+                    l += repr(value) + sep
+            elif isinstance(line, Iterable):
+                for item in data:
+                    l += repr(item) + sep
+            else:
+                l = repr(item)
+            s += l.strip() + '\n'
+    return s
 
 class worker_cmpr(Thread):
     crc16 = crcmod.predefined.Crc('modbus')
@@ -461,30 +334,37 @@ class worker_tmpr(Thread):
                 except:
                     resp = None
                 if resp != None:
-                    self.temperatures[index] = float(resp)
+                    try:
+                        self.temperatures[index] = float(resp)
+                    except:
+                        self.temperatures[index] = None
                 else:
                     self.temperatures[index] = None
             else:
                 self.temperatures[index] = None
                 if resp != None and len(resp) == 3:
-                    r = int(resp)
-                    if r >= 128:
-                        app.logger.warning("sensor units overrange for " + letter)
-                        r -= 128
-                    if r >= 64:
-                        app.logger.warning("sensor units zero for " + letter)
-                        r -= 64
-                    if r >= 32:
-                        app.logger.warning("temp overrange for " + letter)
-                        r -= 32
-                    if r >= 16:
-                        app.logger.warning("temp underrange for " + letter)
-                        r -= 16
-                    if r >= 1:
-                        app.logger.warning("invalid reading for " + letter)
-                        r -= 1
-                    if r > 0:
-                        app.logger.warning("unknown temperature reading error for " + letter)
+                    try:
+                        r = int(resp)
+                    except:
+                        pass
+                    else:
+                        if r >= 128:
+                            app.logger.warning("sensor units overrange for " + letter)
+                            r -= 128
+                        if r >= 64:
+                            app.logger.warning("sensor units zero for " + letter)
+                            r -= 64
+                        if r >= 32:
+                            app.logger.warning("temp overrange for " + letter)
+                            r -= 32
+                        if r >= 16:
+                            app.logger.warning("temp underrange for " + letter)
+                            r -= 16
+                        if r >= 1:
+                            app.logger.warning("invalid reading for " + letter)
+                            r -= 1
+                        if r > 0:
+                            app.logger.warning("unknown temperature reading error for " + letter)
         return
     def read_output(self):
         for index, letter in zip([0, 1], ['1', '2']):
@@ -500,19 +380,26 @@ class worker_tmpr(Thread):
                 except:
                     resp = None
                 if resp != None:
-                    self.output[index] = float(resp)
+                    try:
+                        self.output[index] = float(resp)
+                    except:
+                        self.output[index] = None
                 else:
                     self.output[index] = None
             else:
                 self.output[index] = None
                 if resp != None and len(resp) > 0:
-                    r = int(resp)
-                    if r == 1:
-                        app.logger.warning("heater open load for " + letter)
-                    elif r == 2:
-                        app.logger.warning("heater short for " + letter)
+                    try:
+                        r = int(resp)
+                    except:
+                        pass
                     else:
-                        app.logger.warning("unknown output state reading error for " + letter)
+                        if r == 1:
+                            app.logger.warning("heater open load for " + letter)
+                        elif r == 2:
+                            app.logger.warning("heater short for " + letter)
+                        else:
+                            app.logger.warning("unknown output state reading error for " + letter)
         return
     def read(self, cmd, payload):
         resp = None
@@ -531,9 +418,11 @@ class worker_tmpr(Thread):
                 resp = self.ser.readline().decode("ascii")[:-1]
                 if len(resp) == 0:
                     self.ser.close()
+                    print("restarting " + self.ser.port)
                     self.open_serial()
             except:
                 self.ser.close()
+                print("restarting " + self.ser.port)
                 self.open_serial()
         else:
             self.open_serial()
@@ -577,19 +466,274 @@ class worker_tmpr(Thread):
         self.communicating = False
         return True
     def run(self):
+        global is_realtime_measurement_running
         while True:
             try:
-                self.communicating = True
-                self.read_temperatures()
-                self.read_output()
-                self.communicating = False
+                if not is_realtime_measurement_running:
+                    self.communicating = True
+                    self.read_temperatures()
+                    self.read_output()
+                    self.communicating = False
+                else:
+                    self.temperatures = [None, None]
+                    self.output = [None, None]
                 time.sleep(0.25)
             except (KeyboardInterrupt, SystemExit):
                 self.communicating = False
-                worker_tmpr().stop()
+                self.stop()
                 sys.exit(0)
 
 cmpr = worker_cmpr()
 tmpr = worker_tmpr()
 cmpr.start()
 tmpr.start()
+
+class worker_rtm_tmpr(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+        self.daemon = True
+        self.count = 0
+        self.label = 'A'
+        self.res = []
+        self.paused = True
+    def measure(self):
+        self.res = []
+        global is_realtime_measurement_running
+        if is_realtime_measurement_running:
+            print("another realtime measurement is running")
+            return False
+        if not (self.label in ['A', 'B']):
+            print("invalid termometer mark:", self.label)
+            return False
+        i = 0
+        while tmpr.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("temperature controller is very busy")
+                return False
+        is_realtime_measurement_running = True
+        print("measurement started")
+        init_time = time.time()
+        while len(self.res) < self.count:
+            try:
+                cmd = "rdgst?"
+                try:
+                    resp = tmpr.read(cmd, [self.label]).split(';')[-1].strip()
+                except:
+                    resp = None
+                if resp == "000":
+                    cmd = "krdg?"
+                    try:
+                        resp = tmpr.read(cmd, [self.label]).split(';')[-1].strip()
+                    except:
+                        resp = None
+                    if resp != None:
+                        try:
+                            self.res.append({'time': time.time() - init_time, ('temperature' + self.label): float(resp)})
+                        except:
+                            pass
+            except (KeyboardInterrupt, SystemExit):
+                sys.exit(0)
+        is_realtime_measurement_running = False
+        print("measurement finished")
+        return True
+    def fire(self):
+        self.paused = False
+    def run(self):
+        while True:
+            if not self.paused:
+                self.measure()
+                self.paused = True
+            else:
+                time.sleep(0.1)
+
+tmpr_rtm = worker_rtm_tmpr()
+tmpr_rtm.start()
+
+app = Flask(__name__)
+app.debug = False
+if not app.debug:
+    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.WARNING)
+    log.addHandler(handler)
+    app.logger.addHandler(handler)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0')
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+@app.route('/')
+def index():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('status.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           cmpr_pressures = cmpr.pressures,
+                           cmpr_temperatures = cmpr.temperatures,
+                           cmpr_config_mode = cmpr.config_mode,
+                           cmpr_local_on = cmpr.local_on,
+                           cmpr_cold_head_run = cmpr.cold_head_run,
+                           cmpr_cold_head_pause = cmpr.cold_head_pause,
+                           cmpr_fault_off = cmpr.fault_off,
+                           cmpr_oil_fault_off = cmpr.oil_fault_off,
+                           cmpr_solenoid_on = cmpr.solenoid_on,
+                           cmpr_pressure_off = cmpr.pressure_off,
+                           cmpr_oil_level_alarm = cmpr.oil_level_alarm,
+                           cmpr_water_flow_alarm = cmpr.water_flow_alarm,
+                           cmpr_water_temperature_alarm = cmpr.water_temperature_alarm,
+                           cmpr_helium_temperature_off = cmpr.helium_temperature_off,
+                           cmpr_mains_off = cmpr.mains_off,
+                           cmpr_motor_temperature_off = cmpr.motor_temperature_off,
+                           cmpr_system_on = cmpr.system_on,
+                           tmpr_temperatures = tmpr.temperatures,
+                           tmpr_output = tmpr.output)
+
+@app.route('/json', methods= ['GET'])
+def stuff():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return jsonify(cmpr_pressures = cmpr.pressures,
+                   cmpr_temperatures = cmpr.temperatures,
+                   cmpr_config_mode = cmpr.config_mode,
+                   cmpr_local_on = cmpr.local_on,
+                   cmpr_cold_head_run = cmpr.cold_head_run,
+                   cmpr_cold_head_pause = cmpr.cold_head_pause,
+                   cmpr_fault_off = cmpr.fault_off,
+                   cmpr_oil_fault_off = cmpr.oil_fault_off,
+                   cmpr_solenoid_on = cmpr.solenoid_on,
+                   cmpr_pressure_off = cmpr.pressure_off,
+                   cmpr_oil_level_alarm = cmpr.oil_level_alarm,
+                   cmpr_water_flow_alarm = cmpr.water_flow_alarm,
+                   cmpr_water_temperature_alarm = cmpr.water_temperature_alarm,
+                   cmpr_helium_temperature_off = cmpr.helium_temperature_off,
+                   cmpr_mains_off = cmpr.mains_off,
+                   cmpr_motor_temperature_off = cmpr.motor_temperature_off,
+                   cmpr_system_on = cmpr.system_on,
+                   tmpr_temperatures = tmpr.temperatures,
+                   tmpr_output = tmpr.output)
+
+@app.route('/helium_compressor')
+def cmpr_index():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('cmpr.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           pressures = cmpr.pressures,
+                           temperatures = cmpr.temperatures,
+                           config_mode = cmpr.config_mode,
+                           local_on = cmpr.local_on,
+                           cold_head_run = cmpr.cold_head_run,
+                           cold_head_pause = cmpr.cold_head_pause,
+                           fault_off = cmpr.fault_off,
+                           oil_fault_off = cmpr.oil_fault_off,
+                           solenoid_on = cmpr.solenoid_on,
+                           pressure_off = cmpr.pressure_off,
+                           oil_level_alarm = cmpr.oil_level_alarm,
+                           water_flow_alarm = cmpr.water_flow_alarm,
+                           water_temperature_alarm = cmpr.water_temperature_alarm,
+                           helium_temperature_off = cmpr.helium_temperature_off,
+                           mains_off = cmpr.mains_off,
+                           motor_temperature_off = cmpr.motor_temperature_off,
+                           system_on = cmpr.system_on)
+
+@app.route('/helium_compressor/json', methods= ['GET'])
+def cmpr_json():
+    return jsonify(pressures = cmpr.pressures,
+                   temperatures = cmpr.temperatures,
+                   config_mode = cmpr.config_mode,
+                   local_on = cmpr.local_on,
+                   cold_head_run = cmpr.cold_head_run,
+                   cold_head_pause = cmpr.cold_head_pause,
+                   fault_off = cmpr.fault_off,
+                   oil_fault_off = cmpr.oil_fault_off,
+                   solenoid_on = cmpr.solenoid_on,
+                   pressure_off = cmpr.pressure_off,
+                   oil_level_alarm = cmpr.oil_level_alarm,
+                   water_flow_alarm = cmpr.water_flow_alarm,
+                   water_temperature_alarm = cmpr.water_temperature_alarm,
+                   helium_temperature_off = cmpr.helium_temperature_off,
+                   mains_off = cmpr.mains_off,
+                   motor_temperature_off = cmpr.motor_temperature_off,
+                   system_on = cmpr.system_on)
+
+@app.route('/cmpr_do', methods = ['POST'])
+def cmpr_do():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    if get_mac(request.remote_addr) in masters_list:
+        if cmpr.do(request.form.get('cmd')):
+            return "Command " + request.form['cmd'] + " succeeded"
+        else:
+            return "Command " + request.form['cmd'] + " failed"
+    return "Permission denied"
+
+@app.route('/temperature_controller')
+def tmpr_index():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('tmpr.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           temperatures = tmpr.temperatures,
+                           output = tmpr.output)
+
+@app.route('/temperature_controller/json', methods= ['GET'])
+def tmpr_json():
+    return jsonify(temperatures = tmpr.temperatures,
+                   output = tmpr.output)
+
+@app.route('/tmpr_do', methods = ['POST'])
+def tmpr_do():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    if get_mac(request.remote_addr) in masters_list:
+        if tmpr.do(request.json.get('cmds')):
+            return "Commands succeeded"
+        else:
+            return "Commands failed"
+    return "Permission denied"
+
+@app.route('/jokes', methods = ['GET'])
+def joke():
+    if is_realtime_measurement_running:
+        return ""
+    url = 'http://www.laughfactory.com/joke/loadmorejokes';
+    try:
+        r = requests.get(url, params=request.args, timeout=1)
+        return r.text
+    except:
+        return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
+
+@app.route('/rtm/tmpr', methods = ['POST'])
+def rtm_tmpr():
+    if is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    if get_mac(request.remote_addr) in masters_list:
+        try:
+            tmpr_rtm.label = request.json.get('label')
+            tmpr_rtm.count = int(request.json.get('count'))
+        except:
+            tmpr_rtm.letter = ''
+            tmpr_rtm.count = 0
+            return "Measurement failed to start"
+        else:
+            tmpr_rtm.fire()
+            return "Measurement started"
+    return "Permission denied"
+
+@app.route('/rtm/tmpr/json')
+def rtm_tmpr_json():
+    return jsonify(data = tmpr_rtm.res)
+
+@app.route('/rtm/tmpr/csv')
+def rtm_tmpr_csv():
+#    print(csv(tmpr_rtm.res))
+    return Response(csv(tmpr_rtm.res), mimetype="text/plain")
+

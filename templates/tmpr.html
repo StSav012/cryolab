@@ -202,7 +202,7 @@ var chart = AmCharts.makeChart("chart", {
       }, {
         "label": "Save as …",
         "menu": [{
-          "label": "CSV as time",
+          "label": "CSV as time stamps",
           "click": function() {
               this.toCSV({
                 data: plotData,
@@ -220,7 +220,7 @@ var chart = AmCharts.makeChart("chart", {
               for (var i = 0; i < revData.length; ++i) {
                 if (revData[i][timeKeyName] != null) {
                   if (firstTime != null) {
-                    revData[i][timeKeyName] = +revData[i][timeKeyName] - firstTime;
+                    revData[i][timeKeyName] = 0.001 * (+revData[i][timeKeyName] - firstTime);
                   }
                   else {
                     firstTime = +revData[i][timeKeyName];
@@ -235,7 +235,7 @@ var chart = AmCharts.makeChart("chart", {
               });
             }
         }, {
-          "label": "XLSX as time",
+          "label": "XLSX as time stamps",
           "click": function() {
               this.toXLSX({
                 data: plotData,
@@ -253,7 +253,7 @@ var chart = AmCharts.makeChart("chart", {
               for (var i = 0; i < revData.length; ++i) {
                 if (revData[i][timeKeyName] != null) {
                   if (firstTime != null) {
-                    revData[i][timeKeyName] = +revData[i][timeKeyName] - firstTime;
+                    revData[i][timeKeyName] = 0.001 * (+revData[i][timeKeyName] - firstTime);
                   }
                   else {
                     firstTime = +revData[i][timeKeyName];
@@ -779,3 +779,4 @@ function pid_off(output) {
 </audio>
 </body>
 </html>
+
