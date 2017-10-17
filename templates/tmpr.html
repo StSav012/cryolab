@@ -323,6 +323,12 @@ function update_values() {
 
             var dict = {};
             var in_ok = false;
+            if (data.rtm) {
+                $("div#rtm").show();
+            }
+            else {
+                $("div#rtm").hide();
+            }
             if (data.temperatures != null) {
                 for (var i = 0; i < 2; ++i) {
                     dict["time"] = new Date();
@@ -334,13 +340,23 @@ function update_values() {
                             dict[key] = data.temperatures[i];
                             in_ok = true;
                             {% if master_mind -%}
-                                $($("select#input_list option")[i+1]).show();
+                                $($("table#pid_ch1 select#input_list option")[i+1]).show();
+                                $($("table#pid_ch2 select#input_list option")[i+1]).show();
+                                $("table#rtm").show();
                             {%- endif %}
                     }
                     else {
                         $("#temperature" + (i+1)).html("<b>??</b>");
                         {% if master_mind -%}
-                            $($("select#input_list option")[i+1]).hide();
+                            $($("table#pid_ch1 select#input_list option")[i+1]).hide();
+                            if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex == i+1) {
+                                $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0; 
+                            }
+                            $($("table#pid_ch2 select#input_list option")[i+1]).hide();
+                            if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex == i+1) {
+                                $($("table#pid_ch2 select#input_list")[0]).selectedIndex = 0;
+                            }
+                            $("table#rtm").hide();
                         {%- endif %}
                     }
                 }
@@ -349,9 +365,19 @@ function update_values() {
                 for (var i = 0; i < 2; ++i) {
                     $("#temperature" + (i+1)).html("<b>??</b>");
                     {% if master_mind -%}
-                        $($("select#input_list option")[i+1]).hide();
+                        $($("table#pid_ch1 select#input_list option")[i+1]).hide();
+                        if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex == i+1) {
+                            $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0; 
+                        }
+                        $($("table#pid_ch2 select#input_list option")[i+1]).hide();
+                        if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex == i+1) {
+                            $($("table#pid_ch2 select#input_list")[0]).selectedIndex = 0;
+                        }
                     {%- endif %}
                 }
+                {% if master_mind -%}
+                    $("table#rtm").hide();
+                {%- endif %}
                 dict = {};
             }
             if (Object.keys(dict).length > 1) {
@@ -471,7 +497,7 @@ function pid_on(output) {
     var pid_d = pid_d_field.value;
     $.ajax({
         type: 'post',
-        url: 'tmpr_do',
+        url: '/temperature_controller/do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
           cmds:
@@ -515,7 +541,7 @@ function pid_on(output) {
           ]
         }),
         success: function(data, status) {
-            alert("Data: " + data + "\nStatus: " + status);
+            alert(data);
         }
     });
     setCookie("input" + output,     input, 30);
@@ -530,7 +556,7 @@ function pid_on(output) {
 function pid_off(output) {
     $.ajax({
         type: 'post',
-        url: 'tmpr_do',
+        url: '/temperature_controller/do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
           cmds:
@@ -556,7 +582,32 @@ function pid_off(output) {
           ]
         }),
         success: function(data, status) {
-            alert("Data: " + data + "\nStatus: " + status);
+            alert(data);
+        }
+    });
+}
+</script>
+<script type="text/javascript">
+function rtm() {
+    var input_list = $("table#rtm select#input_list")[0];
+    var input = input_list.options[input_list.selectedIndex].value;
+    var option = $("table#rtm select#input_list option")[input_list.selectedIndex];
+    if ($(option).is(':hidden')) {
+        alert("Invalid input");
+        return;
+    }
+    var count_field = $("table#rtm input#count_field")[0];
+    var count = count_field.value;
+    $.ajax({
+        type: 'post',
+        url: '/temperature_controller/rtm',
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+          label: input,
+          count: count
+        }),
+        success: function(data, status) {
+            alert(data);
         }
     });
 }
@@ -564,6 +615,7 @@ function pid_off(output) {
 {%- endif %}
 </head>
 <body onload="loadSettings();">
+<div id="rtm">Please wait until realtime measurements are over.</div>
 <table class="state">
     <tr>
         <td>
@@ -777,6 +829,32 @@ function pid_off(output) {
     <source src="{{ url_for('static', filename='horse.ogg') }}" type="audio/ogg">
     <source src="{{ url_for('static', filename='horse.mp3') }}" type="audio/mpeg">
 </audio>
+
+{% if master_mind -%}
+<table id="rtm" class="wide">
+    <tr>
+        <td>
+            <input type="button" class="action_button" id="rtm" onclick="rtm()" value="Start realtime measurements">
+        </td>
+        <td>
+            <select id="input_list">
+                <option value="">None</option>
+                <option value="A" selected>A</option>
+                <option value="B">B</option>
+            </select>
+        </td>
+        <td>
+            <input type='number' id="count_field" value="13" step="1" min="1"/>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <a href="/temperature_controller/rtm/csv" target="_blank"><input type="button" class="action_button" value="Show result as text"></a>
+            <a href="/temperature_controller/rtm/json" target="_blank"><input type="button" class="action_button" value="Show result as JSON"></a>
+        </td>
+    </tr>
+</table>
+{%- endif %}
 </body>
 </html>
 

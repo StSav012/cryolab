@@ -664,7 +664,7 @@ def cmpr_json():
                    motor_temperature_off = cmpr.motor_temperature_off,
                    system_on = cmpr.system_on)
 
-@app.route('/cmpr_do', methods = ['POST'])
+@app.route('/helium_compressor/do', methods = ['POST'])
 def cmpr_do():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
@@ -682,14 +682,16 @@ def tmpr_index():
     return render_template('tmpr.html',
                            master_mind = (get_mac(request.remote_addr) in masters_list),
                            temperatures = tmpr.temperatures,
-                           output = tmpr.output)
+                           output = tmpr.output,
+                           rtm  = is_realtime_measurement_running)
 
 @app.route('/temperature_controller/json', methods= ['GET'])
 def tmpr_json():
     return jsonify(temperatures = tmpr.temperatures,
-                   output = tmpr.output)
+                   output = tmpr.output,
+                   rtm = is_realtime_measurement_running)
 
-@app.route('/tmpr_do', methods = ['POST'])
+@app.route('/temperature_controller/do', methods = ['POST'])
 def tmpr_do():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
@@ -711,7 +713,7 @@ def joke():
     except:
         return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
 
-@app.route('/rtm/tmpr', methods = ['POST'])
+@app.route('/temperature_controller/rtm', methods = ['POST'])
 def rtm_tmpr():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
@@ -728,11 +730,11 @@ def rtm_tmpr():
             return "Measurement started"
     return "Permission denied"
 
-@app.route('/rtm/tmpr/json')
+@app.route('/temperature_controller/rtm/json')
 def rtm_tmpr_json():
     return jsonify(data = tmpr_rtm.res)
 
-@app.route('/rtm/tmpr/csv')
+@app.route('/temperature_controller/rtm/csv')
 def rtm_tmpr_csv():
 #    print(csv(tmpr_rtm.res))
     return Response(csv(tmpr_rtm.res), mimetype="text/plain")

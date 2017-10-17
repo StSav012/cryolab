@@ -107,7 +107,7 @@ setInterval(update_values, timePeriod);
 <script type=text/javascript>
 $(document).ready(function() {
     $("input#on").click(function() {
-        $.post("cmpr_do",
+        $.post("/helium_compressor/do",
         {
           cmd: "$ON1",
         },
@@ -116,7 +116,7 @@ $(document).ready(function() {
         });
     });
     $("input#off").click(function() {
-        $.post("cmpr_do",
+        $.post("/helium_compressor/do",
         {
           cmd: "$OFF",
         },
