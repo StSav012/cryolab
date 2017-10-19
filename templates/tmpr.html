@@ -29,7 +29,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='amcharts/plugins/export/export.css') }}" type="text/css" media="all" />
 <script src="{{ url_for('static', filename='amcharts/themes/light.js') }}"></script>
 <script type="text/javascript">
-
+"use strict";
 function setCookie(cname, cvalue, exdays) {
     var d = new Date();
     d.setTime(d.getTime() + (exdays*24*60*60*1000));
@@ -96,11 +96,20 @@ function loadSettings() {
         if (i !== "") {
             $("table#pid_ch" + output + " input#pid_d_field")[0].value = i;
         }
+        i = getCookie("rtm_input");
+        if (i !== "") {
+            $("table#rtm select#input_list")[0].value = i;
+        }
+        i = getCookie("rtm_count");
+        if (i !== "") {
+            $("table#rtm input#count_field")[0].value = i;
+        }
     }
 {%- endif %}
 }
 </script>
 <script type=text/javascript>
+var plotData = [];
 var chart = AmCharts.makeChart("chart", {
   "type": "serial",
   //"theme": "light",
@@ -174,9 +183,6 @@ var chart = AmCharts.makeChart("chart", {
     "autoGridCount": true,
     "minPeriod": "fff"
   },
-  "export": {
-    "enabled": true
-  },
   "dataProvider": [],
   "export": {
     "enabled": true,
@@ -187,7 +193,7 @@ var chart = AmCharts.makeChart("chart", {
     "class": "export-main",
     "label": "Export",
     "menu": [
-      {
+/*      {
         "label": "Download as …",
         "menu": [{
           "format": "PNG",
@@ -199,7 +205,7 @@ var chart = AmCharts.makeChart("chart", {
           "format": "PDF",
           "label": "PDF"
         }]
-      }, {
+      },*/ {
         "label": "Save as …",
         "menu": [{
           "label": "CSV as time stamps",
@@ -217,9 +223,10 @@ var chart = AmCharts.makeChart("chart", {
               var revData = plotData;
               var firstTime = null;
               var timeKeyName = "time";
-              for (var i = 0; i < revData.length; ++i) {
-                if (revData[i][timeKeyName] != null) {
-                  if (firstTime != null) {
+              var i;
+              for (i = 0; i < revData.length; i += 1) {
+                  if (revData[i][timeKeyName] !== null) {
+                      if (firstTime !== null) {
                     revData[i][timeKeyName] = 0.001 * (+revData[i][timeKeyName] - firstTime);
                   }
                   else {
@@ -250,9 +257,10 @@ var chart = AmCharts.makeChart("chart", {
               var revData = plotData;
               var firstTime = null;
               var timeKeyName = "time";
-              for (var i = 0; i < revData.length; ++i) {
-                if (revData[i][timeKeyName] != null) {
-                  if (firstTime != null) {
+              var i;
+              for (i = 0; i < revData.length; i += 1) {
+                if (revData[i][timeKeyName] !== null) {
+                  if (firstTime !== null) {
                     revData[i][timeKeyName] = 0.001 * (+revData[i][timeKeyName] - firstTime);
                   }
                   else {
@@ -301,25 +309,21 @@ var timePeriod = 500;
 var lastRequestTime = new Date();
 var lastResponseTime = new Date();
 var lastReplotTime = new Date();
-var plotData = [];
 function update_values() {
     $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
     var now = new Date();
     if (now - lastRequestTime < 0.9 * timePeriod || now - lastResponseTime < 0.9 * timePeriod) {
         return;
     }
-    else {
-        lastRequestTime = now;
-    }
+    lastRequestTime = now;
     $.getJSON($SCRIPT_ROOT+"/temperature_controller/json",
         function(data) {
+            var i;
             now = new Date();
             if (now - lastResponseTime < 0.9 * timePeriod) {
                 return;
             }
-            else {
-                lastResponseTime = now;
-            }
+            lastResponseTime = now;
 
             var dict = {};
             var in_ok = false;
@@ -330,13 +334,14 @@ function update_values() {
                 $("div#rtm").hide();
             }
             if (data.temperatures != null) {
-                for (var i = 0; i < 2; ++i) {
+                var key;
+                for (i = 0; i < 2; i += 1) {
                     dict["time"] = new Date();
-                    if (data.temperatures[i] != "None" &&
+                    if (data.temperatures[i] !== "None" &&
                         data.temperatures[i] !== "" &&
-                        data.temperatures[i] != null) {
+                        data.temperatures[i] !== null) {
                             $("#temperature" + (i+1)).text(data.temperatures[i]);
-                            var key = "temperature" + (i+1);
+                            key = "temperature" + (i+1);
                             dict[key] = data.temperatures[i];
                             in_ok = true;
                             {% if master_mind -%}
@@ -349,11 +354,11 @@ function update_values() {
                         $("#temperature" + (i+1)).html("<b>??</b>");
                         {% if master_mind -%}
                             $($("table#pid_ch1 select#input_list option")[i+1]).hide();
-                            if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex == i+1) {
-                                $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0; 
+                            if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex === i+1) {
+                                $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0;
                             }
                             $($("table#pid_ch2 select#input_list option")[i+1]).hide();
-                            if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex == i+1) {
+                            if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex === i+1) {
                                 $($("table#pid_ch2 select#input_list")[0]).selectedIndex = 0;
                             }
                             $("table#rtm").hide();
@@ -362,15 +367,15 @@ function update_values() {
                 }
             }
             else {
-                for (var i = 0; i < 2; ++i) {
+                for (i = 0; i < 2; i += 1) {
                     $("#temperature" + (i+1)).html("<b>??</b>");
                     {% if master_mind -%}
                         $($("table#pid_ch1 select#input_list option")[i+1]).hide();
-                        if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex == i+1) {
-                            $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0; 
+                        if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex === i+1) {
+                            $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0;
                         }
                         $($("table#pid_ch2 select#input_list option")[i+1]).hide();
-                        if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex == i+1) {
+                        if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex === i+1) {
                             $($("table#pid_ch2 select#input_list")[0]).selectedIndex = 0;
                         }
                     {%- endif %}
@@ -381,20 +386,20 @@ function update_values() {
                 dict = {};
             }
             if (Object.keys(dict).length > 1) {
-                if (!$("#discard_data").prop('checked')) {
+                if (!$("#discard_data").prop("checked")) {
                     plotData.push(dict);
                     var maxLength = 200;
                     var displayedLength = 0;
-                    for (var i = 0; i < plotData.length; ++i) {
+                    for (i = 0; i < plotData.length; i += 1) {
                         if (plotData[i].time >= chart.chartScrollbar.startTime &&
                             plotData[i].time <= chart.chartScrollbar.endTime) {
-                            ++displayedLength;
+                            displayedLength += 1;
                         }
                     }
                     if (displayedLength > maxLength) {
                         chart.dataProvider = [];
                         var denom = displayedLength / maxLength;
-                        for (var i = 0; Math.round(i) < plotData.length; i += denom) {
+                        for (i = 0; Math.round(i) < plotData.length; i += denom) {
                             chart.dataProvider.push(plotData[Math.round(i)]);
                         }
                     }
@@ -422,11 +427,11 @@ function update_values() {
                 $("input#discard_data + label").hide();
             }
 
-            if (data.output != null) {
-                for (var i = 0; i < 2; ++i) {
-                    if (data.output[i] != "None" &&
+            if (data.output !== null) {
+                for (i = 0; i < 2; i += 1) {
+                    if (data.output[i] !== "None" &&
                         data.output[i] !== "" &&
-                        data.output[i] != null) {
+                        data.output[i] !== null) {
                             $("#output" + (i+1)).text(data.output[i]);
                             {% if master_mind -%}
                                 $("table#pid_ch" + (i+1)).show();
@@ -441,7 +446,7 @@ function update_values() {
                 }
             }
             else {
-                for (var i = 0; i < 2; ++i) {
+                for (i = 0; i < 2; i += 1) {
                     $("#output" + (i+1)).html("<b>??</b>");
                     {% if master_mind -%}
                         $("table#pid_ch" + (i+1)).hide();
@@ -449,10 +454,10 @@ function update_values() {
                 }
             }
         });
-    if (plotData.length == 0) {
+    if (plotData.length === 0) {
         $("div#chart").hide();
     }
-    else if (plotData.length == 1) {        // to fire only once
+    else if (plotData.length === 1) {        // to fire only once
         $("div#chart").show();
         $("input#clear").show();
     }
@@ -465,7 +470,6 @@ $(document).ready(function() {
         chart.validateData();
         $("input#clear").hide();
     });
-//    loadSettings();
 });
 </script>
 {% if master_mind -%}
@@ -610,6 +614,8 @@ function rtm() {
             alert(data);
         }
     });
+    setCookie("rtm_input", input, 30);
+    setCookie("rtm_count", count, 30);
 }
 </script>
 {%- endif %}
