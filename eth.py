@@ -211,8 +211,8 @@ def ramp(s):
     print("garbage:", remote_query(s, "*OPC?"))      # clear buffer
 
 
-#iv_curve(s, 3)
-ramp(s)
+iv_curve(s, 3)
+#ramp(s)
 
 s.close()
 

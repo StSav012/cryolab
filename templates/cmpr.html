@@ -109,19 +109,19 @@ $(document).ready(function() {
     $("input#on").click(function() {
         $.post("/helium_compressor/do",
         {
-          cmd: "$ON1",
+          action: 1,    // 0 = Off, 1 = On
         },
         function(data, status) {
-            alert("Data: " + data + "\nStatus: " + status);
+            alert(data);
         });
     });
     $("input#off").click(function() {
         $.post("/helium_compressor/do",
         {
-          cmd: "$OFF",
+          action: 0,    // 0 = Off, 1 = On
         },
         function(data, status) {
-            alert("Data: " + data + "\nStatus: " + status);
+            alert(data);
         });
     });
 });

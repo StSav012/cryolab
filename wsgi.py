@@ -234,6 +234,14 @@ class worker_cmpr(Thread):
         else:
             self.open_serial()
         return True
+    def turn(self, action):
+        if action == 0:
+            return self.do("$OFF")
+        elif action == 1:
+            return self.do("$ON1")
+        else:
+            print("invalid action:", action)
+            return False
     def do(self, cmd):
         i = 0
         while self.communicating:
@@ -296,6 +304,7 @@ class worker_tmpr(Thread):
         self.communicating = False
         self.temperatures = [None, None]
         self.output = [None, None]
+        self.pid_data = {1: {}, 2: {}}
         self.open_serial()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
@@ -401,16 +410,41 @@ class worker_tmpr(Thread):
                         else:
                             app.logger.warning("unknown output state reading error for " + letter)
         return
+    def pid_turn(self, data):
+        try:
+            ok = True
+            if data['action'] == 1:
+                ok = ok and (data['output'] in [1, 2])
+                ok = ok and (data['mode'] in range(6))
+                ok = ok and (data['input'] in range(3))
+                ok = ok and (data['powerup_enable'] in [0, 1])
+                ok = ok and (data['range'] in range(4))
+                ok = ok and self.do("outmode", [data['output'], data['mode'], data['input'], data['powerup_enable']])
+                ok = ok and self.do("pid",     [data['output'], data['P'],    data['I'],     data['D']])
+                ok = ok and self.do("setp",    [data['output'], data['value']])
+                ok = ok and self.do("range",   [data['output'], data['range']])
+            else:
+                ok = ok and (data['output'] in [1, 2])
+                ok = ok and self.do("outmode", [data['output'], 0, 0, 0])
+                ok = ok and self.do("range",   [data['output'], 0])
+        except:
+            ok = False
+        return ok
     def read(self, cmd, payload):
         resp = None
         if self.ser.is_open:
             msg = cmd + '?'
-            for item in payload:
-                if item == payload[0]:
-                    msg += ' '
-                else:
-                    msg += ','
-                msg += item
+            if isinstance(payload, Iterable):
+                first_item = True
+                for item in payload:
+                    if first_item:
+                        msg += ' '
+                        first_item = False
+                    else:
+                        msg += ','
+                    msg += str(item)
+            elif len(payload) > 0:
+                msg += ' ' + str(payload)
             msg += '\n'
             try:
                 self.ser.write(msg.encode('ascii'))
@@ -427,7 +461,7 @@ class worker_tmpr(Thread):
         else:
             self.open_serial()
         return resp
-    def do(self, cmds):
+    def do(self, cmd, payload):
         i = 0
         while self.communicating:
             time.sleep(0.1)
@@ -436,27 +470,27 @@ class worker_tmpr(Thread):
                 print("temperature controller is very busy")
                 return False
         if self.ser.is_open:
-            if isinstance(cmds, Iterable):
-                for cmd in cmds:
-                    msg = cmd['cmd']
-                    for item in cmd['payload']:
-                        if item == cmd['payload'][0]:
-                            msg += ' '
-                        else:
-                            msg += ','
-                        msg += str(item)
-                    # print(msg)
-                    msg += '\n'
-                    try:
-                        self.ser.write(msg.encode('ascii'))
-                        self.ser.flush()
-                    except:
-                        self.ser.close()
-                        self.open_serial()
-                        self.communicating = False
-                        return False
-            else:
-                print("commands are not iterable")
+            msg = cmd.strip()
+            if isinstance(payload, Iterable):
+                first_item = True
+                for item in payload:
+                    if first_item:
+                        msg += ' '
+                        first_item = False
+                    else:
+                        msg += ','
+                    msg += str(item)
+            elif len(payload) > 0:
+                msg += ' ' + str(payload)
+            # print(msg)
+            msg += '\n'
+            try:
+                self.communicating = True
+                self.ser.write(msg.encode('ascii'))
+                self.ser.flush()
+            except:
+                self.ser.close()
+                self.open_serial()
                 self.communicating = False
                 return False
         else:
@@ -669,10 +703,13 @@ def cmpr_do():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
     if get_mac(request.remote_addr) in masters_list:
-        if cmpr.do(request.form.get('cmd')):
-            return "Command " + request.form['cmd'] + " succeeded"
-        else:
-            return "Command " + request.form['cmd'] + " failed"
+        try:
+            if cmpr.turn(request.form.get('action')):
+                return "Command succeeded"
+            else:
+                return "Command failed"
+        except:
+            return "Command failed with an error"
     return "Permission denied"
 
 @app.route('/temperature_controller')
@@ -689,17 +726,44 @@ def tmpr_index():
 def tmpr_json():
     return jsonify(temperatures = tmpr.temperatures,
                    output = tmpr.output,
+                   pid = tmpr.pid_data,
                    rtm = is_realtime_measurement_running)
 
-@app.route('/temperature_controller/do', methods = ['POST'])
+@app.route('/temperature_controller/pid/do', methods = ['POST'])
 def tmpr_do():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
     if get_mac(request.remote_addr) in masters_list:
-        if tmpr.do(request.json.get('cmds')):
-            return "Commands succeeded"
+        data = request.json;
+        if tmpr.pid_turn(data):
+            try:
+                if data['action'] == 0:
+                    tmpr.pid_data[data['output']] = {
+                            'input':          None,
+                            'mode':           None,
+                            'powerup_enable': None,
+                            'range':          None,
+                            'value':          None,
+                            'P':              None,
+                            'I':              None,
+                            'D':              None 
+                            }
+                elif data['action'] == 1:
+                    tmpr.pid_data[data['output']] = {
+                            'input':          data['input'],
+                            'mode':           data['mode'],
+                            'powerup_enable': data['powerup_enable'],
+                            'range':          data['range'],
+                            'value':          data['value'],
+                            'P':              data['P'],
+                            'I':              data['I'],
+                            'D':              data['D']
+                            }
+            except:
+                return "Command apparently failed with a confusing error"
+            return "Command succeeded"
         else:
-            return "Commands failed"
+            return "Command failed"
     return "Permission denied"
 
 @app.route('/jokes', methods = ['GET'])

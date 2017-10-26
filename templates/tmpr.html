@@ -109,6 +109,10 @@ function loadSettings() {
 }
 </script>
 <script type=text/javascript>
+function isEmpty(obj) {
+    return Object.keys(obj).length === 0 && obj.constructor === Object && obj.toString.length === 0;
+}
+
 var plotData = [];
 var chart = AmCharts.makeChart("chart", {
   "type": "serial",
@@ -446,31 +450,68 @@ function update_values() {
                 }
             }
             else {
-                for (i = 0; i < 2; i += 1) {
-                    $("#output" + (i+1)).html("<b>??</b>");
+                for (i = 1; i <= 2; i += 1) {
+                    $("#output" + i).html("<b>??</b>");
                     {% if master_mind -%}
-                        $("table#pid_ch" + (i+1)).hide();
+                        $("table#pid_ch" + i).hide();
                     {%- endif %}
                 }
             }
+
+            {% if master_mind -%}
+            if (data.pid !== null) {
+                for (i = 1; i <= 2; i += 1) {
+                    if (data.pid[i] !== null && !isEmpty(data.pid[i])) {
+                    {% for item in [['input',          'select#input_list'],
+                                    ['mode',           'select#pid_mode_list'],
+                                    ['powerup_enable', 'select#powerup_list'],
+                                    ['range',          'select#pid_range_list'],
+                                    ['value',          'input#pid_value_field'],
+                                    ['P',              'input#pid_p_field'],
+                                    ['I',              'input#pid_i_field'],
+                                    ['D',              'input#pid_d_field']] %}
+                        if (data.pid[i]['{{ item[0] }}'] !== null &&
+                            data.pid[i]['{{ item[0] }}'] !== "") {
+                            if (!$($("table#pid_ch" + i + " {{ item[1] }}")[0]).hasClass("changed")) {
+                                ($("table#pid_ch" + i + " {{ item[1] }}")[0]).value = data.pid[i]['{{ item[0] }}'];
+                            }
+                            else if (($("table#pid_ch" + i + " {{ item[1] }}")[0]).value == data.pid[i]['{{ item[0] }}']) {
+                                $($("table#pid_ch" + i + " {{ item[1] }}")[0]).removeClass("changed");
+                            }
+                        }
+                    {% endfor %}
+                    }
+                }
+            }
+            {%- endif %}
         });
-    if (plotData.length === 0) {
-        $("div#chart").hide();
+        if (plotData.length === 0) {
+            $("div#chart").hide();
+        }
+        else if (plotData.length === 1) {        // to fire only once
+            $("div#chart").show();
+            $("input#clear").show();
+        }
     }
-    else if (plotData.length === 1) {        // to fire only once
-        $("div#chart").show();
-        $("input#clear").show();
-    }
-}
-setInterval(update_values, timePeriod);
-$(document).ready(function() {
-    $("input#clear").click(function() {
-        chart.dataProvider = [];
-        plotData = [];
-        chart.validateData();
-        $("input#clear").hide();
+    setInterval(update_values, timePeriod);
+    $(document).ready(function() {
+        $("input#clear").click(function() {
+            chart.dataProvider = [];
+            plotData = [];
+            chart.validateData();
+            $("input#clear").hide();
+        });
+        {% if master_mind -%}
+        var i;
+        for (i = 1; i <= 2; i += 1) {
+            $("table#pid_ch" + i + " select, table#pid_ch" + i + " input[type='number']").each(function() {
+                $(this).change(function() {
+                    $(this).addClass("changed");
+                });
+            });
+        }
+        {%- endif %}
     });
-});
 </script>
 {% if master_mind -%}
 <script type="text/javascript">
@@ -480,69 +521,33 @@ function pid_on(output) {
         return;
     }
     var input_list = $("table#pid_ch" + output + " select#input_list")[0];
-    var input = input_list.options[input_list.selectedIndex].value;
-    if ($($("table#pid_ch" + output + " select#input_list option")[input_list.selectedIndex]).is(':hidden')) {
+    var input = input_list.value;
+    if (input_list.selectedOptions.length !== 1 || $(input_list.selectedOptions[0]).is(':hidden')) {
         alert("Invalid input");
         return;
     }
-    var pid_mode_list = $("table#pid_ch" + output + " select#pid_mode_list")[0];
-    var pid_mode = pid_mode_list.options[pid_mode_list.selectedIndex].value;
-    var powerup_list = $("table#pid_ch" + output + " select#powerup_list")[0];
-    var powerup = powerup_list.options[powerup_list.selectedIndex].value;
-    var pid_range_list = $("table#pid_ch" + output + " select#pid_range_list")[0];
-    var pid_range = pid_range_list.options[pid_range_list.selectedIndex].value;
-    var pid_value_field = $("table#pid_ch" + output + " input#pid_value_field")[0];
-    var pid_value = pid_value_field.value;
-    var pid_p_field = $("table#pid_ch" + output + " input#pid_p_field")[0];
-    var pid_p = pid_p_field.value;
-    var pid_i_field = $("table#pid_ch" + output + " input#pid_i_field")[0];
-    var pid_i = pid_i_field.value;
-    var pid_d_field = $("table#pid_ch" + output + " input#pid_d_field")[0];
-    var pid_d = pid_d_field.value;
+    var pid_mode = ($("table#pid_ch" + output + " select#pid_mode_list")[0]).value;
+    var powerup = ($("table#pid_ch" + output + " select#powerup_list")[0]).value;
+    var pid_range = ($("table#pid_ch" + output + " select#pid_range_list")[0]).value;
+    var pid_value = ($("table#pid_ch" + output + " input#pid_value_field")[0]).value;
+    var pid_p = ($("table#pid_ch" + output + " input#pid_p_field")[0]).value;
+    var pid_i = ($("table#pid_ch" + output + " input#pid_i_field")[0]).value;
+    var pid_d = ($("table#pid_ch" + output + " input#pid_d_field")[0]).value;
     $.ajax({
         type: 'post',
-        url: '/temperature_controller/do',
+        url: '/temperature_controller/pid/do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
-          cmds:
-          [
-            {
-              cmd: "outmode",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* mode:           */   pid_mode,   // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
-                /* input:          */   input,      // 0 = None, 1 = A, 2 = B
-                /* powerup_enable: */   powerup     // 0 = Off, 1 = On
-              ]
-            },
-            {
-              cmd: "pid",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* P:              */   pid_p,      // Proportional (gain)
-                /* I:              */   pid_i,      // Integral (reset)
-                /* D:              */   pid_d       // Derivative (rate)
-              ]
-            },
-            {
-              cmd: "setp",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* value:          */   pid_value   // respect the sensor units!
-              ]
-            },
-            {
-              cmd: "range",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* range:          */   pid_range   // 0 = Off, 1 = Low, 2 = Medium, 3 = High
-              ]
-            }
-          ]
+            action:          1,          // 0 = Off, 1 = On
+            output:         +output,     // 1 or 2
+            mode:           +pid_mode,   // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
+            input:          +input,      // 0 = None, 1 = A, 2 = B
+            powerup_enable: +powerup,    // 0 = Off, 1 = On
+            P:              +pid_p,      // Proportional (gain)
+            I:              +pid_i,      // Integral (reset)
+            D:              +pid_d,      // Derivative (rate)
+            value:          +pid_value,  // respect the sensor units!
+            range:          +pid_range   // 0 = Off, 1 = Low, 2 = Medium, 3 = High
         }),
         success: function(data, status) {
             alert(data);
@@ -560,30 +565,11 @@ function pid_on(output) {
 function pid_off(output) {
     $.ajax({
         type: 'post',
-        url: '/temperature_controller/do',
+        url: '/temperature_controller/pid/do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
-          cmds:
-          [
-            {
-              cmd: "outmode",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* mode:           */   0,          // 0 = Off, 1 = Closed Loop PID, 2 = Zone, 3 = Open Loop, 4 = Monitor Out, 5 = Warmup Supply
-                /* input:          */   0,          // 0 = None, 1 = A, 2 = B
-                /* powerup_enable: */   0           // 0 = Off, 1 = On
-              ]
-            },
-            {
-              cmd: "range",
-              payload:
-              [
-                /* output:         */   output,     // 1 or 2
-                /* range:          */   0           // 0 = Off, 1 = Low, 2 = Medium, 3 = High
-              ]
-            }
-          ]
+            action:          0,          // 0 = Off, 1 = On
+            output:          output      // 1 or 2
         }),
         success: function(data, status) {
             alert(data);
@@ -604,11 +590,11 @@ function rtm() {
     var count = count_field.value;
     $.ajax({
         type: 'post',
-        url: '/temperature_controller/rtm',
+        url: '/temperature_controller/rtm/do',
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({
-          label: input,
-          count: count
+            label:  input,
+            count: +count
         }),
         success: function(data, status) {
             alert(data);
@@ -621,246 +607,256 @@ function rtm() {
 {%- endif %}
 </head>
 <body onload="loadSettings();">
-<div id="rtm">Please wait until realtime measurements are over.</div>
-<table class="state">
-    <tr>
-        <td>
-            <table class="wide">
-                {{ watch(title='Temperature A:', id='temperature1', value=temperatures[0], unit='K') }}
-                {{ watch(title='Temperature B:', id='temperature2', value=temperatures[1], unit='K') }}
-                {{ watch(title='Output 1:', id='output1', value=output[0], unit='%') }}
-                {{ watch(title='Output 2:', id='output2', value=output[1], unit='%') }}
-            </table>
-        </td>
-    </tr>
-{% if master_mind -%}
-    <tr>
-        <td>
-            <table class="wide" id="pid">
-                <tr>
-                    <td>
-                        <table class="wide" id="pid_ch1">
-                            <tr>
-                                <td>Output:</td>
-                                <td>
-                                    <b>1</b>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Input:</td>
-                                <td>
-                                    <select id="input_list">
-                                        <option value="0">None</option>
-                                        <option value="1" selected>A</option>
-                                        <option value="2">B</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Mode:</td>
-                                <td>
-                                    <select id="pid_mode_list">
-                                        <option value="0">Off</option>
-                                        <option value="1" selected>Closed Loop PID</option>
-                                        <option value="2">Zone</option>
-                                        <option value="3">Open Loop</option>
-                                        <option value="4">Monitor Out</option>
-                                        <option value="5">Warmup Supply</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Range:</td>
-                                <td>
-                                    <select id="pid_range_list">
-                                        <option value="0">Off</option>
-                                        <option value="1">Low</option>
-                                        <option value="2" selected>Medium</option>
-                                        <option value="3">High</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Powerup:</td>
-                                <td>
-                                    <select id="powerup_list">
-                                        <option value="0">Off</option>
-                                        <option value="1" selected>On</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Desired value:</td>
-                                <td>
-                                    <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>P:</td>
-                                <td>
-                                    <input type='number' id="pid_p_field" value="50" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>I:</td>
-                                <td>
-                                    <input type='number' id="pid_i_field" value="20" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>D:</td>
-                                <td>
-                                    <input type='number' id="pid_d_field" value="0" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="align_center" colspan=2>
-                                    <input type="button" class="action_button" onclick="pid_on(1)" value="Turn PID on!">
-                                    <input type="button" class="action_button" onclick="pid_off(1)" value="Turn PID off!">
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                    <td>
-                        <table class="wide" id="pid_ch2">
-                            <tr>
-                                <td>Output:</td>
-                                <td>
-                                    <b>2</b>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Input:</td>
-                                <td>
-                                    <select id="input_list">
-                                        <option value="0">None</option>
-                                        <option value="1">A</option>
-                                        <option value="2" selected>B</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Mode:</td>
-                                <td>
-                                    <select id="pid_mode_list">
-                                        <option value="0">Off</option>
-                                        <option value="1" selected>Closed Loop PID</option>
-                                        <option value="2">Zone</option>
-                                        <option value="3">Open Loop</option>
-                                        <option value="4">Monitor Out</option>
-                                        <option value="5">Warmup Supply</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Range:</td>
-                                <td>
-                                    <select id="pid_range_list">
-                                        <option value="0">Off</option>
-                                        <option value="1">Low</option>
-                                        <option value="2" selected>Medium</option>
-                                        <option value="3">High</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Powerup:</td>
-                                <td>
-                                    <select id="powerup_list">
-                                        <option value="0">Off</option>
-                                        <option value="1" selected>On</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Desired value:</td>
-                                <td>
-                                    <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>P:</td>
-                                <td>
-                                    <input type='number' id="pid_p_field" value="50" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>I:</td>
-                                <td>
-                                    <input type='number' id="pid_i_field" value="20" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>D:</td>
-                                <td>
-                                    <input type='number' id="pid_d_field" value="0" step="any"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="align_center" colspan=2>
-                                    <input type="button" class="action_button" onclick="pid_on(2)" value="Turn PID on!">
-                                    <input type="button" class="action_button" onclick="pid_off(2)" value="Turn PID off!">
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-{%- endif %}
-    <tr>
-        <td>
-            <div id="chart"></div>
-        </td>
-    </tr>
-    <tr>
-        <td class="align_center">
-            <table class="fixed centered">
-                <tr>
-                    <td>
-                        <input type="checkbox" id="discard_data">
-                        <label for="discard_data">Don't record temperatures</label>
-                    </td>
-                    <td>
-                        <input type="button" id="clear" value="Clear Data">
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-</table>
+    <div id="rtm">Please wait until realtime measurements are over.</div>
+    <table class="state">
+        <tr>
+            <td>
+                <table class="wide">
+                    {{ watch(title='Temperature A:', id='temperature1', value=temperatures[0], unit='K') }}
+                    {{ watch(title='Temperature B:', id='temperature2', value=temperatures[1], unit='K') }}
+                    {{ watch(title='Output 1:', id='output1', value=output[0], unit='%') }}
+                    {{ watch(title='Output 2:', id='output2', value=output[1], unit='%') }}
+                </table>
+            </td>
+        </tr>
+        {% if master_mind -%}
+        <tr>
+            <td>
+                <table class="wide" id="pid">
+                    <tr>
+                        <td>
+                            <table class="wide" id="pid_ch1">
+                                <tr>
+                                    <td>Output:</td>
+                                    <td>
+                                        <b>1</b>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Input:</td>
+                                    <td>
+                                        <select id="input_list">
+                                            <option value="0">None</option>
+                                            <option value="1" selected>A</option>
+                                            <option value="2">B</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Mode:</td>
+                                    <td>
+                                        <select id="pid_mode_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>Closed Loop PID</option>
+                                            <option value="2">Zone</option>
+                                            <option value="3">Open Loop</option>
+                                            <option value="4">Monitor Out</option>
+                                            <option value="5">Warmup Supply</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Range:</td>
+                                    <td>
+                                        <select id="pid_range_list">
+                                            <option value="0">Off</option>
+                                            <option value="1">Low</option>
+                                            <option value="2" selected>Medium</option>
+                                            <option value="3">High</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Powerup:</td>
+                                    <td>
+                                        <select id="powerup_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>On</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Desired value:</td>
+                                    <td>
+                                        <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>P:</td>
+                                    <td>
+                                        <input type='number' id="pid_p_field" value="50" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>I:</td>
+                                    <td>
+                                        <input type='number' id="pid_i_field" value="20" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>D:</td>
+                                    <td>
+                                        <input type='number' id="pid_d_field" value="0" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align_center" colspan=2>
+                                        <input type="button" class="action_button" onclick="pid_on(1)" value="Turn PID on!">
+                                        <input type="button" class="action_button" onclick="pid_off(1)" value="Turn PID off!">
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td>
+                            <table class="wide" id="pid_ch2">
+                                <tr>
+                                    <td>Output:</td>
+                                    <td>
+                                        <b>2</b>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Input:</td>
+                                    <td>
+                                        <select id="input_list">
+                                            <option value="0">None</option>
+                                            <option value="1">A</option>
+                                            <option value="2" selected>B</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Mode:</td>
+                                    <td>
+                                        <select id="pid_mode_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>Closed Loop PID</option>
+                                            <option value="2">Zone</option>
+                                            <option value="3">Open Loop</option>
+                                            <option value="4">Monitor Out</option>
+                                            <option value="5">Warmup Supply</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Range:</td>
+                                    <td>
+                                        <select id="pid_range_list">
+                                            <option value="0">Off</option>
+                                            <option value="1">Low</option>
+                                            <option value="2" selected>Medium</option>
+                                            <option value="3">High</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Powerup:</td>
+                                    <td>
+                                        <select id="powerup_list">
+                                            <option value="0">Off</option>
+                                            <option value="1" selected>On</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Desired value:</td>
+                                    <td>
+                                        <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>P:</td>
+                                    <td>
+                                        <input type='number' id="pid_p_field" value="50" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>I:</td>
+                                    <td>
+                                        <input type='number' id="pid_i_field" value="20" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>D:</td>
+                                    <td>
+                                        <input type='number' id="pid_d_field" value="0" step="any"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="align_center" colspan=2>
+                                        <input type="button" class="action_button" onclick="pid_on(2)" value="Turn PID on!">
+                                        <input type="button" class="action_button" onclick="pid_off(2)" value="Turn PID off!">
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        {%- endif %}
+        <tr>
+            <td>
+                <div id="chart"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="align_center">
+                <table class="fixed centered">
+                    <tr>
+                        <td>
+                            <input type="checkbox" id="discard_data">
+                            <label for="discard_data">Don't record temperatures</label>
+                        </td>
+                        <td>
+                            <input type="button" id="clear" value="Clear Data">
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 
-<audio preload="auto" id="warning">
-    <source src="{{ url_for('static', filename='horse.ogg') }}" type="audio/ogg">
-    <source src="{{ url_for('static', filename='horse.mp3') }}" type="audio/mpeg">
-</audio>
+    <audio preload="auto" id="warning">
+        <source src="{{ url_for('static', filename='horse.ogg') }}" type="audio/ogg">
+        <source src="{{ url_for('static', filename='horse.mp3') }}" type="audio/mpeg">
+    </audio>
 
-{% if master_mind -%}
-<table id="rtm" class="wide">
-    <tr>
-        <td>
-            <input type="button" class="action_button" id="rtm" onclick="rtm()" value="Start realtime measurements">
-        </td>
-        <td>
-            <select id="input_list">
-                <option value="">None</option>
-                <option value="A" selected>A</option>
-                <option value="B">B</option>
-            </select>
-        </td>
-        <td>
-            <input type='number' id="count_field" value="13" step="1" min="1"/>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <a href="/temperature_controller/rtm/csv" target="_blank"><input type="button" class="action_button" value="Show result as text"></a>
-            <a href="/temperature_controller/rtm/json" target="_blank"><input type="button" class="action_button" value="Show result as JSON"></a>
-        </td>
-    </tr>
-</table>
-{%- endif %}
+    {% if master_mind -%}
+    <hr>
+    <table id="rtm" class="wide">
+        <caption>Realtime temperature measurements</caption>
+        <tr>
+            <th></th>
+            <th>Input:</th>
+            <th>Count:</th>
+        </tr>
+        <tr>
+            <td class="align_center">
+                <input type="button" class="action_button" id="rtm" onclick="rtm()" value="Start measurements">
+            </td>
+            <td>
+                <select id="input_list">
+                    <option value="">None</option>
+                    <option value="A" selected>A</option>
+                    <option value="B">B</option>
+                </select>
+            </td>
+            <td>
+                <input type='number' id="count_field" value="13" step="1" min="1"/>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <a href="/temperature_controller/rtm/csv" target="_blank"><input type="button" class="action_button" value="Show result as text"></a>
+                <a href="/temperature_controller/rtm/json" target="_blank"><input type="button" class="action_button" value="Show result as JSON"></a>
+            </td>
+            <td colspan="2">
+                <strong>Warning!</strong> You will <em>not</em> be able to proceed until the measurements are over.
+            </td>
+        </tr>
+    </table>
+    {%- endif %}
 </body>
 </html>
 
