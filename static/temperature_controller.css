@@ -168,6 +168,33 @@ input#clear:active {
     background-color: maroon;
 }
 
+input.accordeon {
+    display: none;
+}
+input.accordeon + label {
+    font-size: 12pt;
+    text-decoration: none;
+    font-weight: bold;
+    background: darkcyan;
+    color: white;
+    border: none;
+    text-shadow: 0px -1px 0px rgba(0,0,0,.5);
+    box-shadow: inset 0px 1px 0px rgba(255,255,255,.3), inset 0px 0px 3px rgba(255,255,255,.5);
+    cursor: pointer;
+    border-radius: 0.5rem;
+    padding-inline-start: 0.25rem;
+    padding-inline-end: 0.25rem;
+    padding: 0.25rem;
+    width: 100%;
+    display: inline-block;
+    display: inline-flex;
+    box-sizing: border-box;
+}
+input.accordeon:checked + label {
+    background-color: cadetblue;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
 div#rtm {
     display: none;
     background-color: rgba(255,128,128,0.8);

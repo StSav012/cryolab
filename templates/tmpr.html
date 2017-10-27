@@ -62,8 +62,8 @@ function loadSettings() {
         $("#discard_data").prop('checked', true);
     }
 {% if master_mind -%}
-    var i;
-    for (var output = 1; output <= 2; ++output) {
+    var i, output;
+    for (output = 1; output <= 2; ++output) {
         i = getCookie("input" + output);
         if (i !== "") {
             $("table#pid_ch" + output + " select#input_list")[0].value = i;
@@ -106,6 +106,50 @@ function loadSettings() {
         }
     }
 {%- endif %}
+    $("input[type='checkbox'][id$='-caption']").each(function() {
+        i = getCookie(this.id);
+        if (i !== "") {
+            this.checked = (i == "true");
+        }
+        toggleTable(this);
+    });
+}
+</script>
+<script type=text/javascript>
+function toggleTable(object) {
+    "use strict";
+    var selector = "", s;
+    var me = object;
+    do {
+        me = me.parentNode;
+    } while (me.tagName !== "BODY" && me.tagName !== "CAPTION");
+    if (me.tagName == "BODY") {
+        return;
+    }
+    me = me.parentNode;
+    while (me.tagName !== "BODY") {
+        s = me.tagName;
+        if (me.id !== "") {
+            s += "#" + me.id;
+        }
+        if (selector.length !== 0) {
+            selector = " > " + selector;
+        }
+        selector = s + selector;
+        if (me.tagName === "TABLE") {
+            break;
+        }
+        me = me.parentNode;
+    }
+    if (me.tagName === "BODY") {
+        return;
+    }
+    var trs = document.querySelectorAll(selector + " > TBODY > TR, " + selector + " > TR");
+    var tr;
+    for (tr of trs) {
+        tr.style.display = object.checked ? 'table-row' : 'none';
+    }
+    setCookie(object.id, object.checked, 30);
 }
 </script>
 <script type=text/javascript>
@@ -640,6 +684,10 @@ function rtm() {
         <tr>
             <td>
                 <table class="wide" id="pid">
+                    <caption>
+                        <input type="checkbox" id="pid-caption" class="accordeon" onclick="toggleTable(this)" checked>
+                        <label for="pid-caption">PID Control</label>
+                    </caption>
                     <tr>
                         <td>
                             <table class="wide" id="pid_ch1">
@@ -814,19 +862,29 @@ function rtm() {
         {%- endif %}
         <tr>
             <td>
-                <div id="chart"></div>
-            </td>
-        </tr>
-        <tr>
-            <td class="align_center">
-                <table class="fixed centered">
+                <table id="chart-wrapper" class="wide">
+                    <caption>
+                        <input type="checkbox" id="chart-caption" class="accordeon" onclick="toggleTable(this)" checked>
+                        <label for="chart-caption">Temperature Timeline</label>
+                    </caption>
                     <tr>
                         <td>
-                            <input type="checkbox" id="discard_data">
-                            <label for="discard_data">Don't record temperatures</label>
+                            <div id="chart"></div>
                         </td>
-                        <td>
-                            <input type="button" id="clear" value="Clear Data">
+                    </tr>
+                    <tr>
+                        <td class="align_center">
+                            <table class="fixed centered">
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" id="discard_data">
+                                        <label for="discard_data">Don't record temperatures</label>
+                                    </td>
+                                    <td>
+                                        <input type="button" id="clear" value="Clear Data">
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                 </table>
@@ -840,9 +898,11 @@ function rtm() {
     </audio>
 
     {% if master_mind -%}
-    <hr>
     <table id="rtm" class="wide">
-        <caption>Realtime temperature measurements</caption>
+        <caption>
+            <input type="checkbox" id="rtm-caption" class="accordeon" onclick="toggleTable(this)">
+            <label for="rtm-caption">Realtime Temperature Measurements</label>
+        </caption>
         <tr>
             <th></th>
             <th>Input:</th>
