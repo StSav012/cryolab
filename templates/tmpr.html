@@ -460,6 +460,7 @@ function update_values() {
 
             {% if master_mind -%}
             if (data.pid !== null) {
+                var item;
                 for (i = 1; i <= 2; i += 1) {
                     if (data.pid[i] !== null && !isEmpty(data.pid[i])) {
                     {% for item in [['input',          'select#input_list'],
@@ -470,17 +471,33 @@ function update_values() {
                                     ['P',              'input#pid_p_field'],
                                     ['I',              'input#pid_i_field'],
                                     ['D',              'input#pid_d_field']] %}
+                        item = $("table#pid_ch" + i + " {{ item[1] }}")[0];
                         if (data.pid[i]['{{ item[0] }}'] !== null &&
                             data.pid[i]['{{ item[0] }}'] !== "") {
-                            if (!$($("table#pid_ch" + i + " {{ item[1] }}")[0]).hasClass("changed")) {
-                                ($("table#pid_ch" + i + " {{ item[1] }}")[0]).value = data.pid[i]['{{ item[0] }}'];
+                            if (!$(item).hasClass("changed")) {
+                                item.value = data.pid[i]['{{ item[0] }}'];
                             }
-                            else if (($("table#pid_ch" + i + " {{ item[1] }}")[0]).value == data.pid[i]['{{ item[0] }}']) {
-                                $($("table#pid_ch" + i + " {{ item[1] }}")[0]).removeClass("changed");
+                            else if (item.value == data.pid[i]['{{ item[0] }}']) {
+                                $(item).removeClass("changed");
                             }
+                        }
+                        else {
+                            $(item).removeClass("changed");
                         }
                     {% endfor %}
                     }
+                    else {
+                        $("table#pid_ch" + i + " select, table#pid_ch" + i + " input[type='number']").each(function() {
+                            $(this).removeClass("changed");
+                        });
+                    }
+                }
+            }
+            else {
+                for (i = 1; i <= 2; i += 1) {
+                    $("table#pid_ch" + i + " select, table#pid_ch" + i + " input[type='number']").each(function() {
+                        $(this).removeClass("changed");
+                    });
                 }
             }
             {%- endif %}
