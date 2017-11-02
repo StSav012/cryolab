@@ -23,15 +23,10 @@ function update_values() {
         if (iframe &&
             iframe.contentWindow &&
             iframe.contentWindow.document &&
-            iframe.contentWindow.document.body) {
-            if (iframe.contentWindow.document.body.scrollHeight) {
-                iframe.height = iframe.contentWindow.document.body.scrollHeight;
-            }
-            if (iframe.contentWindow.document.body.style &&
-                iframe.contentWindow.document.body.style.marginTop !== null &&
-                iframe.contentWindow.document.body.style.marginBottom !== null) {
-                iframe.contentWindow.document.body.style.marginTop = 0;
-                iframe.contentWindow.document.body.style.marginBottom = 0;
+            iframe.contentWindow.document.body &&
+            iframe.contentWindow.document.body.parentNode) {
+            if (iframe.contentWindow.document.body.parentNode.scrollHeight) {
+                iframe.height = iframe.contentWindow.document.body.parentNode.scrollHeight;
             }
         }
     }

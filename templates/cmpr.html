@@ -109,7 +109,7 @@ $(document).ready(function() {
     $("input#on").click(function() {
         $.post("/helium_compressor/do",
         {
-          action: 1,    // 0 = Off, 1 = On
+          action: +1,    // 0 = Off, 1 = On
         },
         function(data, status) {
             alert(data);
@@ -118,7 +118,7 @@ $(document).ready(function() {
     $("input#off").click(function() {
         $.post("/helium_compressor/do",
         {
-          action: 0,    // 0 = Off, 1 = On
+          action: +0,    // 0 = Off, 1 = On
         },
         function(data, status) {
             alert(data);

@@ -235,9 +235,10 @@ class worker_cmpr(Thread):
             self.open_serial()
         return True
     def turn(self, action):
-        if action == 0:
+        # print(type(action)) # TODO: why is action of string?
+        if action == '0':
             return self.do("$OFF")
-        elif action == 1:
+        elif action == '1':
             return self.do("$ON1")
         else:
             print("invalid action:", action)

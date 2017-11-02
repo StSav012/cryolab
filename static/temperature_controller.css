@@ -111,7 +111,7 @@ td.large {
 
 div#chart {
     min-width: 320px;
-    height: 480px;
+    height: 460px;
     display: none;
 }
 
@@ -193,6 +193,13 @@ input.accordeon + label {
 input.accordeon:checked + label {
     background-color: cadetblue;
     border-radius: 0.5rem 0.5rem 0 0;
+}
+
+table.accordeon {
+    border-left: 1px solid cadetblue;
+    border-right: 1px solid cadetblue;
+    border-radius: 0 0 0.5rem 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 div#rtm {
