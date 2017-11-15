@@ -18,6 +18,8 @@ from IPy import IP
 from subprocess import Popen, PIPE
 from collections import Iterable
 import requests
+import numpy as np
+import sounddevice as sd
 
 def get_mac(ip):
     mac = None
@@ -73,6 +75,25 @@ def csv(data, sep = '\t'):
                 l = repr(item)
             s += l.strip() + '\n'
     return s
+
+def sine_tone(frequency, duration, volume=1, sample_rate=44100):
+    n_samples = int(sample_rate * duration)
+    t = np.arange(n_samples) / sample_rate
+    sd.play(volume * np.sin(2 * np.pi * frequency * t),
+            samplerate=sample_rate,
+            blocking=True,
+            device='sysdefault')
+
+def snd_notify():
+    for i in range(30):
+        sine_tone(3135.96, 0.2)
+        #sine_tone(2093.00, 0.2)
+        sd.sleep(200)
+
+def snd_warning():
+    for i in range(4):
+        sine_tone(2093.00, 0.2)
+        sine_tone(1760.00, 0.2)
 
 class worker_cmpr(Thread):
     crc16 = crcmod.predefined.Crc('modbus')
@@ -306,6 +327,8 @@ class worker_tmpr(Thread):
         self.temperatures = [None, None]
         self.output = [None, None]
         self.pid_data = {1: {}, 2: {}}
+        self.error_in = ""
+        self.error_out = ""
         self.open_serial()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
@@ -345,9 +368,14 @@ class worker_tmpr(Thread):
                     resp = None
                 if resp != None:
                     try:
-                        self.temperatures[index] = float(resp)
+                        temp = float(resp)
                     except:
                         self.temperatures[index] = None
+                    else:
+                        if self.temperatures[index] != None and temp < 70 and self.temperatures[index] > 70:
+                            snd_notify()
+                        self.temperatures[index] = temp
+                        self.error_in = ""
                 else:
                     self.temperatures[index] = None
             else:
@@ -358,23 +386,36 @@ class worker_tmpr(Thread):
                     except:
                         pass
                     else:
+                        self.error_in = ""
                         if r >= 128:
-                            app.logger.warning("sensor units overrange for " + letter)
+                            self.error_in = "Sensor units overrange for " + letter
                             r -= 128
                         if r >= 64:
-                            app.logger.warning("sensor units zero for " + letter)
+                            if len(self.error_in) > 0:
+                                self.error_in += '\n'
+                            self.error_in += "Sensor units zero for " + letter
                             r -= 64
                         if r >= 32:
-                            app.logger.warning("temp overrange for " + letter)
+                            if len(self.error_in) > 0:
+                                self.error_in += '\n'
+                            self.error_in += "Temp overrange for " + letter
                             r -= 32
                         if r >= 16:
-                            app.logger.warning("temp underrange for " + letter)
+                            if len(self.error_in) > 0:
+                                self.error_in += '\n'
+                            self.error_in += "Temp underrange for " + letter
                             r -= 16
                         if r >= 1:
-                            app.logger.warning("invalid reading for " + letter)
+                            if len(self.error_in) > 0:
+                                self.error_in += '\n'
+                            self.error_in += "Invalid reading for " + letter
                             r -= 1
                         if r > 0:
-                            app.logger.warning("unknown temperature reading error for " + letter)
+                            if len(self.error_in) > 0:
+                                self.error_in += '\n'
+                            self.error_in += "Unknown temperature reading error for " + letter
+                        app.logger.warning(self.error_in)
+                        snd_warning()
         return
     def read_output(self):
         for index, letter in zip([0, 1], ['1', '2']):
@@ -392,6 +433,7 @@ class worker_tmpr(Thread):
                 if resp != None:
                     try:
                         self.output[index] = float(resp)
+                        self.error_out = ""
                     except:
                         self.output[index] = None
                 else:
@@ -405,24 +447,30 @@ class worker_tmpr(Thread):
                         pass
                     else:
                         if r == 1:
-                            app.logger.warning("heater open load for " + letter)
+                            self.error_out = "Heater open load for " + letter
                         elif r == 2:
-                            app.logger.warning("heater short for " + letter)
+                            self.error_out = "Heater short for " + letter
                         else:
-                            app.logger.warning("unknown output state reading error for " + letter)
+                            self.error_out = "Unknown output state reading error for " + letter
+                        app.logger.warning(self.error_out)
+                        snd_warning()
         return
     def pid_turn(self, data):
         try:
             ok = True
             if data['action'] == 1:
-                ok = ok and (data['output'] in [1, 2])
                 ok = ok and (data['mode'] in range(6))
                 ok = ok and (data['input'] in range(3))
                 ok = ok and (data['powerup_enable'] in [0, 1])
                 ok = ok and (data['range'] in range(4))
-                ok = ok and self.do("outmode", [data['output'], data['mode'], data['input'], data['powerup_enable']])
-                ok = ok and self.do("pid",     [data['output'], data['P'],    data['I'],     data['D']])
-                ok = ok and self.do("setp",    [data['output'], data['value']])
+                if data['mode'] != 3:
+                    ok = ok and (data['output'] in [1, 2])
+                    ok = ok and self.do("outmode", [data['output'], data['mode'], data['input'], data['powerup_enable']])
+                    ok = ok and self.do("pid",     [data['output'], data['P'],    data['I'],     data['D']])
+                    ok = ok and self.do("setp",    [data['output'], data['value']])
+                else:
+                    ok = ok and self.do("outmode", [data['output'], 3, 0, data['powerup_enable']])
+                    ok = ok and self.do("mout",    [data['output'], data['manual']])
                 ok = ok and self.do("range",   [data['output'], data['range']])
             else:
                 ok = ok and (data['output'] in [1, 2])
@@ -725,9 +773,17 @@ def tmpr_index():
 
 @app.route('/temperature_controller/json', methods= ['GET'])
 def tmpr_json():
+    error = ""
+    if len(tmpr.error_in) > 0:
+        error = tmpr.error_in
+    if len(tmpr.error_out) > 0:
+        if len(error) > 0:
+            error += '\n'
+        error += tmpr.error_out
     return jsonify(temperatures = tmpr.temperatures,
                    output = tmpr.output,
                    pid = tmpr.pid_data,
+                   error = error,
                    rtm = is_realtime_measurement_running)
 
 @app.route('/temperature_controller/pid/do', methods = ['POST'])
@@ -747,7 +803,8 @@ def tmpr_do():
                             'value':          None,
                             'P':              None,
                             'I':              None,
-                            'D':              None 
+                            'D':              None,
+                            'manual':         None
                             }
                 elif data['action'] == 1:
                     tmpr.pid_data[data['output']] = {
@@ -758,7 +815,8 @@ def tmpr_do():
                             'value':          data['value'],
                             'P':              data['P'],
                             'I':              data['I'],
-                            'D':              data['D']
+                            'D':              data['D'],
+                            'manual':         data['manual']
                             }
             except:
                 return "Command apparently failed with a confusing error"

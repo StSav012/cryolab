@@ -93,6 +93,10 @@ table.state > tr > td {
     margin-right: auto;
 }
 
+.hidden {
+    display: none;
+}
+
 .align_center {
     text-align: center;
 }
@@ -212,6 +216,23 @@ div#rtm {
     line-height: 100vh;
 }
 
-table#rtm {
-    display: none;
+@keyframes glowing {
+    0%   { box-shadow: initial; }
+    50%  { box-shadow: 0 0 0.5em coral; }
+    100% { box-shadow: initial; }
 }
+
+div#error {
+    display: none;
+    border: firebrick solid 1px;
+    margin: 0.5em;
+    padding: 0.5em;
+    background: bisque;
+    border-radius: 0.5rem;
+    color: firebrick;
+    font-size: large;
+    box-sizing: border-box;
+    animation: glowing 1500ms infinite;
+    white-space: pre;
+}
+

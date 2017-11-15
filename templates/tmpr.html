@@ -64,38 +64,21 @@ function loadSettings() {
 {% if master_mind -%}
     var i, output;
     for (output = 1; output <= 2; ++output) {
-        i = getCookie("input" + output);
+        {% for item in [['input',          'select#input_list'],
+                        ['pid_mode',       'select#pid_mode_list'],
+                        ['powerup',        'select#powerup_list'],
+                        ['pid_range',          'select#pid_range_list'],
+                        ['pid_value',          'input#pid_value_field'],
+                        ['pid_p',              'input#pid_p_field'],
+                        ['pid_i',              'input#pid_i_field'],
+                        ['pid_d',              'input#pid_d_field'],
+                        ['pid_manual',         'input#pid_manual_field']] %}
+        i = getCookie("{{ item[0] }}" + output);
         if (i !== "") {
-            $("table#pid_ch" + output + " select#input_list")[0].value = i;
+            $("table#pid_ch" + output + " {{ item[1] }}")[0].value = i;
         }
-        i = getCookie("pid_mode" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " select#pid_mode_list")[0].value = i;
-        }
-        i = getCookie("powerup" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " select#powerup_list")[0].value = i;
-        }
-        i = getCookie("pid_range" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " select#pid_range_list")[0].value = i;
-        }
-        i = getCookie("pid_value" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " input#pid_value_field")[0].value = i;
-        }
-        i = getCookie("pid_p" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " input#pid_p_field")[0].value = i;
-        }
-        i = getCookie("pid_i" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " input#pid_i_field")[0].value = i;
-        }
-        i = getCookie("pid_d" + output);
-        if (i !== "") {
-            $("table#pid_ch" + output + " input#pid_d_field")[0].value = i;
-        }
+        {% endfor %}
+        pid_mode_change(output);
         i = getCookie("rtm_input");
         if (i !== "") {
             $("table#rtm select#input_list")[0].value = i;
@@ -153,6 +136,7 @@ function toggleTable(object) {
 }
 </script>
 <script type=text/javascript>
+"use strict";
 function isEmpty(obj) {
     return Object.keys(obj).length === 0 && obj.constructor === Object && obj.toString.length === 0;
 }
@@ -358,14 +342,21 @@ var lastRequestTime = new Date();
 var lastResponseTime = new Date();
 var lastReplotTime = new Date();
 function update_values() {
-    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
     var now = new Date();
     if (now - lastRequestTime < 0.9 * timePeriod || now - lastResponseTime < 0.9 * timePeriod) {
         return;
     }
     lastRequestTime = now;
-    $.getJSON($SCRIPT_ROOT+"/temperature_controller/json",
+    $.getJSON($SCRIPT_ROOT + "/temperature_controller/json",
         function(data) {
+            if (data.error !== null && data.error !== "") {
+                $("div#error").show();
+                $("div#error").text(data.error);
+            }
+            else {
+                $("div#error").hide();
+            }
             var i;
             now = new Date();
             if (now - lastResponseTime < 0.9 * timePeriod) {
@@ -375,13 +366,15 @@ function update_values() {
 
             var dict = {};
             var in_ok = false;
+            {% if master_mind -%}
             if (data.rtm) {
-                $("div#rtm").show();
+                $("table#rtm").show();
             }
             else {
-                $("div#rtm").hide();
+                $("table#rtm").hide();
             }
-            if (data.temperatures != null) {
+            {%- endif %}
+            if (data.temperatures !== null) {
                 var key;
                 for (i = 0; i < 2; i += 1) {
                     dict["time"] = new Date();
@@ -417,16 +410,6 @@ function update_values() {
             else {
                 for (i = 0; i < 2; i += 1) {
                     $("#temperature" + (i+1)).html("<b>??</b>");
-                    {% if master_mind -%}
-                        $($("table#pid_ch1 select#input_list option")[i+1]).hide();
-                        if ($($("table#pid_ch1 select#input_list")[0]).selectedIndex === i+1) {
-                            $($("table#pid_ch1 select#input_list")[0]).selectedIndex = 0;
-                        }
-                        $($("table#pid_ch2 select#input_list option")[i+1]).hide();
-                        if ($($("table#pid_ch2 select#input_list")[0]).selectedIndex === i+1) {
-                            $($("table#pid_ch2 select#input_list")[0]).selectedIndex = 0;
-                        }
-                    {%- endif %}
                 }
                 {% if master_mind -%}
                     $("table#rtm").hide();
@@ -470,9 +453,15 @@ function update_values() {
             }
             if (in_ok) {
                 $("input#discard_data + label").show();
+                $("table#chart-wrapper").show();
+                $("table#pid").show();
             }
             else {
                 $("input#discard_data + label").hide();
+                if (plotData.length === 0) {
+                    $("table#chart-wrapper").hide();
+                }
+                $("table#pid").hide();
             }
 
             if (data.output !== null) {
@@ -514,7 +503,8 @@ function update_values() {
                                     ['value',          'input#pid_value_field'],
                                     ['P',              'input#pid_p_field'],
                                     ['I',              'input#pid_i_field'],
-                                    ['D',              'input#pid_d_field']] %}
+                                    ['D',              'input#pid_d_field'],
+                                    ['manual',         'input#pid_manual_field']] %}
                         item = $("table#pid_ch" + i + " {{ item[1] }}")[0];
                         if (data.pid[i]['{{ item[0] }}'] !== null &&
                             data.pid[i]['{{ item[0] }}'] !== "") {
@@ -566,9 +556,9 @@ function update_values() {
         var i;
         for (i = 1; i <= 2; i += 1) {
             $("table#pid_ch" + i + " select, table#pid_ch" + i + " input[type='number']").each(function() {
-                $(this).change(function() {
+                this.oninput = function() {
                     $(this).addClass("changed");
-                });
+                };
             });
         }
         {%- endif %}
@@ -576,24 +566,37 @@ function update_values() {
 </script>
 {% if master_mind -%}
 <script type="text/javascript">
+"use strict";
+function pid_mode_change(output) {
+    var pid_mode = ($("table#pid_ch" + output + " select#pid_mode_list")[0]).value;
+    if (pid_mode == '3') {
+        $("table#pid_ch" + output + " .pid_auto").hide();
+        $("table#pid_ch" + output + " .pid_manual").show();
+    }
+    else {
+        $("table#pid_ch" + output + " .pid_auto").show();
+        $("table#pid_ch" + output + " .pid_manual").hide();
+    }
+}
 function pid_on(output) {
     if ($($("table#pid_ch" + output)[0]).is(':hidden')) {
         alert("Invalid output");
         return;
     }
+    var pid_mode = ($("table#pid_ch" + output + " select#pid_mode_list")[0]).value;
     var input_list = $("table#pid_ch" + output + " select#input_list")[0];
     var input = input_list.value;
-    if (input_list.selectedOptions.length !== 1 || $(input_list.selectedOptions[0]).is(':hidden')) {
+    if (pid_mode != '3' && (input_list.selectedOptions.length !== 1 || $(input_list.selectedOptions[0]).is(':hidden'))) {
         alert("Invalid input");
         return;
     }
-    var pid_mode = ($("table#pid_ch" + output + " select#pid_mode_list")[0]).value;
     var powerup = ($("table#pid_ch" + output + " select#powerup_list")[0]).value;
     var pid_range = ($("table#pid_ch" + output + " select#pid_range_list")[0]).value;
     var pid_value = ($("table#pid_ch" + output + " input#pid_value_field")[0]).value;
     var pid_p = ($("table#pid_ch" + output + " input#pid_p_field")[0]).value;
     var pid_i = ($("table#pid_ch" + output + " input#pid_i_field")[0]).value;
     var pid_d = ($("table#pid_ch" + output + " input#pid_d_field")[0]).value;
+    var pid_manual = ($("table#pid_ch" + output + " input#pid_manual_field")[0]).value;
     $.ajax({
         type: 'post',
         url: '/temperature_controller/pid/do',
@@ -608,20 +611,26 @@ function pid_on(output) {
             I:              +pid_i,      // Integral (reset)
             D:              +pid_d,      // Derivative (rate)
             value:          +pid_value,  // respect the sensor units!
-            range:          +pid_range   // 0 = Off, 1 = Low, 2 = Medium, 3 = High
+            range:          +pid_range,  // 0 = Off, 1 = Low, 2 = Medium, 3 = High
+            manual:         +pid_manual  // %
         }),
         success: function(data, status) {
             alert(data);
         }
     });
-    setCookie("input" + output,     input, 30);
     setCookie("pid_mode" + output,  pid_mode, 30);
     setCookie("powerup" + output,   powerup, 30);
-    setCookie("pid_range" + output, pid_range, 30);
-    setCookie("pid_value" + output, pid_value, 30);
-    setCookie("pid_p" + output,     pid_p, 30);
-    setCookie("pid_i" + output,     pid_i, 30);
-    setCookie("pid_d" + output,     pid_d, 30);
+    if (pid_mode != '3') {
+        setCookie("input" + output,     input, 30);
+        setCookie("pid_value" + output,  pid_value, 30);
+        setCookie("pid_range" + output, pid_range, 30);
+        setCookie("pid_p" + output,      pid_p, 30);
+        setCookie("pid_i" + output,      pid_i, 30);
+        setCookie("pid_d" + output,      pid_d, 30);
+    }
+    else {
+        setCookie("pid_manual" + output, pid_manual, 30);
+    }
 }
 function pid_off(output) {
     $.ajax({
@@ -639,6 +648,7 @@ function pid_off(output) {
 }
 </script>
 <script type="text/javascript">
+"use strict";
 function rtm() {
     var input_list = $("table#rtm select#input_list")[0];
     var input = input_list.options[input_list.selectedIndex].value;
@@ -669,6 +679,7 @@ function rtm() {
 </head>
 <body onload="loadSettings();">
     <div id="rtm">Please wait until realtime measurements are over.</div>
+    <div id="error"></div>
     <table class="wide">
         {{ watch(title='Temperature A:', id='temperature1', value=temperatures[0], unit='K') }}
         {{ watch(title='Temperature B:', id='temperature2', value=temperatures[1], unit='K') }}
@@ -676,7 +687,7 @@ function rtm() {
         {{ watch(title='Output 2:', id='output2', value=output[1], unit='%') }}
     </table>
     {% if master_mind -%}
-    <table class="wide accordeon" id="pid">
+    <table class="wide accordeon hidden" id="pid">
         <caption>
             <input type="checkbox" id="pid-caption" class="accordeon" onclick="toggleTable(this)" checked>
             <label for="pid-caption">PID Control</label>
@@ -690,7 +701,7 @@ function rtm() {
                             <b>1</b>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>Input:</td>
                         <td>
                             <select id="input_list">
@@ -703,18 +714,14 @@ function rtm() {
                     <tr>
                         <td>Mode:</td>
                         <td>
-                            <select id="pid_mode_list">
-                                <option value="0">Off</option>
-                                <option value="1" selected>Closed Loop PID</option>
-                                <option value="2">Zone</option>
-                                <option value="3">Open Loop</option>
-                                <option value="4">Monitor Out</option>
-                                <option value="5">Warmup Supply</option>
+                            <select id="pid_mode_list" onchange="pid_mode_change(1)">
+                                <option value="1" selected>Auto</option>
+                                <option value="3">Manual</option>
                             </select>
                         </td>
                     </tr>
                     <tr>
-                        <td>Range:</td>
+                        <td>Heater range:</td>
                         <td>
                             <select id="pid_range_list">
                                 <option value="0">Off</option>
@@ -733,28 +740,34 @@ function rtm() {
                             </select>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>Desired value:</td>
                         <td>
                             <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>P:</td>
                         <td>
                             <input type='number' id="pid_p_field" value="50" step="any"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>I:</td>
                         <td>
                             <input type='number' id="pid_i_field" value="20" step="any"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>D:</td>
                         <td>
                             <input type='number' id="pid_d_field" value="0" step="any"/>
+                        </td>
+                    </tr>
+                    <tr class="pid_manual hidden">
+                        <td>Fixed output:</td>
+                        <td>
+                            <input type='number' id="pid_manual_field" value="0.00" step="0.01" min="0.00"/>
                         </td>
                     </tr>
                     <tr>
@@ -773,7 +786,7 @@ function rtm() {
                             <b>2</b>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>Input:</td>
                         <td>
                             <select id="input_list">
@@ -786,18 +799,14 @@ function rtm() {
                     <tr>
                         <td>Mode:</td>
                         <td>
-                            <select id="pid_mode_list">
-                                <option value="0">Off</option>
-                                <option value="1" selected>Closed Loop PID</option>
-                                <option value="2">Zone</option>
-                                <option value="3">Open Loop</option>
-                                <option value="4">Monitor Out</option>
-                                <option value="5">Warmup Supply</option>
+                            <select id="pid_mode_list" onchange="pid_mode_change(1)">
+                                <option value="1" selected>Auto</option>
+                                <option value="3">Manual</option>
                             </select>
                         </td>
                     </tr>
                     <tr>
-                        <td>Range:</td>
+                        <td>Heater range:</td>
                         <td>
                             <select id="pid_range_list">
                                 <option value="0">Off</option>
@@ -816,28 +825,34 @@ function rtm() {
                             </select>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>Desired value:</td>
                         <td>
                             <input type='number' id="pid_value_field" value="292.73" step="0.01" min="0.00"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>P:</td>
                         <td>
                             <input type='number' id="pid_p_field" value="50" step="any"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>I:</td>
                         <td>
                             <input type='number' id="pid_i_field" value="20" step="any"/>
                         </td>
                     </tr>
-                    <tr>
+                    <tr class="pid_auto">
                         <td>D:</td>
                         <td>
                             <input type='number' id="pid_d_field" value="0" step="any"/>
+                        </td>
+                    </tr>
+                    <tr class="pid_manual hidden">
+                        <td>Fixed output:</td>
+                        <td>
+                            <input type='number' id="pid_manual_field" value="0.00" step="0.01" min="0.00"/>
                         </td>
                     </tr>
                     <tr>
@@ -851,7 +866,7 @@ function rtm() {
         </tr>
     </table>
     {%- endif %}
-    <table id="chart-wrapper" class="wide accordeon">
+    <table id="chart-wrapper" class="wide accordeon hidden">
         <caption>
             <input type="checkbox" id="chart-caption" class="accordeon" onclick="toggleTable(this)" checked>
             <label for="chart-caption">Temperature Timeline</label>
@@ -884,7 +899,7 @@ function rtm() {
     </audio>
 
     {% if master_mind -%}
-    <table id="rtm" class="wide accordeon">
+    <table id="rtm" class="wide accordeon hidden">
         <caption>
             <input type="checkbox" id="rtm-caption" class="accordeon" onclick="toggleTable(this)">
             <label for="rtm-caption">Realtime Temperature Measurements</label>
@@ -900,7 +915,6 @@ function rtm() {
             </td>
             <td>
                 <select id="input_list">
-                    <option value="">None</option>
                     <option value="A" selected>A</option>
                     <option value="B">B</option>
                 </select>
