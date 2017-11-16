@@ -327,8 +327,10 @@ class worker_tmpr(Thread):
         self.temperatures = [None, None]
         self.output = [None, None]
         self.pid_data = {1: {}, 2: {}}
-        self.error_in = ""
-        self.error_out = ""
+        self.error_in = ["", ""]
+        self.error_in_sounded = [False, False]
+        self.error_out = ["", ""]
+        self.error_out_sounded = [False, False]
         self.open_serial()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
@@ -372,10 +374,11 @@ class worker_tmpr(Thread):
                     except:
                         self.temperatures[index] = None
                     else:
-                        if self.temperatures[index] != None and temp < 70 and self.temperatures[index] > 70:
+                        if self.temperatures[index] != None and temp < 77 and self.temperatures[index] > 77:
                             snd_notify()
                         self.temperatures[index] = temp
-                        self.error_in = ""
+                        self.error_in[index] = ""
+                        self.error_in_sounded[index] = False
                 else:
                     self.temperatures[index] = None
             else:
@@ -386,36 +389,36 @@ class worker_tmpr(Thread):
                     except:
                         pass
                     else:
-                        self.error_in = ""
+                        self.error_in[index] = ""
                         if r >= 128:
-                            self.error_in = "Sensor units overrange for " + letter
+                            self.error_in[index] = "Sensor units overrange for " + letter
                             r -= 128
                         if r >= 64:
                             if len(self.error_in) > 0:
-                                self.error_in += '\n'
-                            self.error_in += "Sensor units zero for " + letter
+                                self.error_in[index] += '\n'
+                            self.error_in[index] += "Sensor units zero for " + letter
                             r -= 64
                         if r >= 32:
                             if len(self.error_in) > 0:
-                                self.error_in += '\n'
-                            self.error_in += "Temp overrange for " + letter
+                                self.error_in[index] += '\n'
+                            self.error_in[index] += "Temp overrange for " + letter
                             r -= 32
                         if r >= 16:
                             if len(self.error_in) > 0:
-                                self.error_in += '\n'
-                            self.error_in += "Temp underrange for " + letter
+                                self.error_in[index] += '\n'
+                            self.error_in[index] += "Temp underrange for " + letter
                             r -= 16
                         if r >= 1:
                             if len(self.error_in) > 0:
-                                self.error_in += '\n'
-                            self.error_in += "Invalid reading for " + letter
+                                self.error_in[index] += '\n'
+                            self.error_in[index] += "Invalid reading for " + letter
                             r -= 1
-                        if r > 0:
-                            if len(self.error_in) > 0:
-                                self.error_in += '\n'
-                            self.error_in += "Unknown temperature reading error for " + letter
-                        app.logger.warning(self.error_in)
-                        snd_warning()
+                        if r != 0:
+                            self.error_in[index] = "Unknown temperature reading error for " + letter
+                        app.logger.warning(self.error_in[index])
+                        if not self.error_in_sounded[index]:
+                            snd_warning()
+                            self.error_in_sounded[index] = True
         return
     def read_output(self):
         for index, letter in zip([0, 1], ['1', '2']):
@@ -433,9 +436,11 @@ class worker_tmpr(Thread):
                 if resp != None:
                     try:
                         self.output[index] = float(resp)
-                        self.error_out = ""
                     except:
                         self.output[index] = None
+                    else:
+                        self.error_out[index] = ""
+                        self.error_out_sounded[index] = False
                 else:
                     self.output[index] = None
             else:
@@ -447,13 +452,15 @@ class worker_tmpr(Thread):
                         pass
                     else:
                         if r == 1:
-                            self.error_out = "Heater open load for " + letter
+                            self.error_out[index] = "Heater open load for " + letter
                         elif r == 2:
-                            self.error_out = "Heater short for " + letter
+                            self.error_out[index] = "Heater short for " + letter
                         else:
-                            self.error_out = "Unknown output state reading error for " + letter
-                        app.logger.warning(self.error_out)
-                        snd_warning()
+                            self.error_out[index] = "Unknown output state reading error for " + letter
+                        app.logger.warning(self.error_out[index])
+                        if not self.error_out_sounded[index]:
+                            snd_warning()
+                            self.error_out_sounded[index] = True
         return
     def pid_turn(self, data):
         try:
@@ -774,12 +781,15 @@ def tmpr_index():
 @app.route('/temperature_controller/json', methods= ['GET'])
 def tmpr_json():
     error = ""
-    if len(tmpr.error_in) > 0:
-        error = tmpr.error_in
-    if len(tmpr.error_out) > 0:
-        if len(error) > 0:
-            error += '\n'
-        error += tmpr.error_out
+    for index in range(2):
+        if len(tmpr.error_in[index]) > 0:
+            if len(error) > 0:
+                error += '\n'
+            error = tmpr.error_in[index]
+        if len(tmpr.error_out[index]) > 0:
+            if len(error) > 0:
+                error += '\n'
+            error += tmpr.error_out[index]
     return jsonify(temperatures = tmpr.temperatures,
                    output = tmpr.output,
                    pid = tmpr.pid_data,
