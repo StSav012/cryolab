@@ -689,6 +689,7 @@ class bot(ClientXMPP):
 
         self.add_event_handler("session_start", self.session_start)
         self.add_event_handler("message", self.message)
+        self.add_event_handler("disconnected", self.disconnected)
 
         import ssl
         self.ssl_version = ssl.PROTOCOL_TLSv1
@@ -720,11 +721,12 @@ class bot(ClientXMPP):
                     reply = '''Possible commands:
 about,
 help,
-compressor {state [verbose] | state {on | off} | pressure | temperatures},
+compressor [state [verbose] | state {on | off} | pressure | temperatures],
 temperature {A | B},
 pid {1 | 2} [on {#% | #K {A | B}} | off | range {low | medium | high} | powerup {on | off} | pid #P #I #D]'''
                     if words[1] == 'compressor':
                         reply = '''Possible commands:
+compressor,
 compressor state,
 compressor state verbose,
 compressor state on,
@@ -744,11 +746,11 @@ pid {1 | 2} range {low | medium | high},
 pid {1 | 2} powerup {on | off},
 pid {1 | 2} pid #P #I #D'''
                 elif words[0] == 'compressor':
+                    if cmpr.system_on:
+                        reply = 'on'
+                    else:
+                        reply = 'off'
                     if words[1] in ['state', 'status']:
-                        if cmpr.system_on:
-                            reply = 'on'
-                        else:
-                            reply = 'off'
                         if words[2] in ['on', 'off']:
                             if sender in trusted_senders:
                                 if words[2] == 'off':
@@ -1012,6 +1014,11 @@ water in: %d°C''' % (cmpr.temperatures[0], cmpr.temperatures[1], cmpr.temperatu
                 pass
             msg.reply(reply).send()
 
+    def disconnected(self, data):
+        logging.warning('XMPP disconnected')
+        print('XMPP disconnected')
+        self.disconnect(reconnect=True, send_close=False)
+
 xmpp = bot(config['XMPP']['jid'], config['XMPP']['pass'])
 # xmpp.register_plugin('xep_0030') # Service Discovery
 # xmpp.register_plugin('xep_0004') # Data Forms
@@ -1029,6 +1036,7 @@ xmpp.proxy_config = {
 print("Starting")
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 # app.debug = True
 if not app.debug:
     formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
@@ -1051,14 +1059,6 @@ xmpp.process(block=False)
 cmpr.start()
 tmpr.start()
 tmpr_rtm.start()
-
-if __name__ == '__main__':
-    print("Running")
-#    app.config.update(APPLICATION_ROOT='/')
-    try:
-        app.run(host='0.0.0.0', port=80, threaded=True)
-    except:
-        app.run(host='0.0.0.0', threaded=True)
 
 @app.errorhandler(404)
 def page_not_found(error):
@@ -1286,4 +1286,12 @@ def rtm_tmpr_json():
 def rtm_tmpr_csv():
 #    print(csv(tmpr_rtm.res))
     return Response(csv(tmpr_rtm.res), mimetype="text/plain")
+
+if __name__ == '__main__':
+    print("Running")
+#    app.config.update(APPLICATION_ROOT='/')
+    try:
+        app.run(host='0.0.0.0', port=80, threaded=True)
+    except:
+        app.run(host='0.0.0.0', threaded=True)
 
