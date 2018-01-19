@@ -37,7 +37,7 @@ def get_mac(ip):
     return mac
 
 config = configparser.ConfigParser()
-config.read('wsgi.ini')
+config.read('/cryolab/python/wsgi.ini')
 
 masters_list = [mac.split('#')[0].strip() for mac in config['masters']['MACs'].splitlines()]
 
@@ -121,7 +121,7 @@ class worker_cmpr(Thread):
         self.mains_off = None
         self.motor_temperature_off = None
         self.system_on = None
-        self.open_serial()
+#        self.open_serial()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
         for port in ports:
@@ -332,7 +332,7 @@ class worker_tmpr(Thread):
         self.error_in_sounded = [False, False]
         self.error_out = ["", ""]
         self.error_out_sounded = [False, False]
-        self.open_serial()
+#        self.open_serial()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
         for port in ports:
@@ -609,7 +609,7 @@ class worker_tmpr(Thread):
                 else:
                     self.temperatures = [None, None]
                     self.output = [None, None]
-                time.sleep(0.25)
+                time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 self.communicating = False
                 self.stop()
@@ -617,8 +617,6 @@ class worker_tmpr(Thread):
 
 cmpr = worker_cmpr()
 tmpr = worker_tmpr()
-cmpr.start()
-tmpr.start()
 
 class worker_rtm_tmpr(Thread):
     def __init__(self):
@@ -681,7 +679,6 @@ class worker_rtm_tmpr(Thread):
                 time.sleep(0.1)
 
 tmpr_rtm = worker_rtm_tmpr()
-tmpr_rtm.start()
 
 trusted_senders = [login.split('#')[0].strip() for login in config['masters']['jabbers'].splitlines()]
 
@@ -787,9 +784,9 @@ pid {1 | 2} pid #P #I #D'''
                                 reply += 'Failure: mains!!!\n' if cmpr.mains_off else ''
                                 reply += 'Failure: motor temperature!!!' if cmpr.motor_temperature_off else ''
                     elif words[1] in ['temperature', 'temperatures']:
-                        reply = '''helium: %d°C, \r
-                        water out: %d°C, \r
-                        water in: %d°C''' % (cmpr.temperatures[0], cmpr.temperatures[1], cmpr.temperatures[2])
+                        reply = '''helium: %d°C,
+water out: %d°C,
+water in: %d°C''' % (cmpr.temperatures[0], cmpr.temperatures[1], cmpr.temperatures[2])
                     elif words[1] == 'pressure':
                         reply = 'helium: %d psig' % cmpr.pressures[0]
                 elif words[0] == 'temperature':
@@ -1015,20 +1012,6 @@ pid {1 | 2} pid #P #I #D'''
                 pass
             msg.reply(reply).send()
 
-app = Flask(__name__)
-app.debug = False
-if not app.debug:
-    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
-    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.WARNING)
-    log.addHandler(handler)
-    app.logger.addHandler(handler)
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
-
 xmpp = bot(config['XMPP']['jid'], config['XMPP']['pass'])
 # xmpp.register_plugin('xep_0030') # Service Discovery
 # xmpp.register_plugin('xep_0004') # Data Forms
@@ -1042,15 +1025,53 @@ xmpp.proxy_config = {
     'username': config['proxy']['username'],
     'password': config['proxy']['password']
 }
-xmpp.connect((config['XMPP']['server'], int(config['XMPP']['port'])))
+
+print("Starting")
+
+app = Flask(__name__)
+# app.debug = True
+if not app.debug:
+    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+    handler = TimedRotatingFileHandler('logs/wsgi.log', when='midnight', interval=1, backupCount=5)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.DEBUG)
+    log.addHandler(handler)
+    app.logger.addHandler(handler)
+else:
+    logging.basicConfig(level=logging.DEBUG)
+
+if xmpp.connect((config['XMPP']['server'], int(config['XMPP']['port']))):
+    print("XMPP connected")
+else:
+    print("XMPP connection failed")
+
 xmpp.process(block=False)
+cmpr.start()
+tmpr.start()
+tmpr_rtm.start()
+
+if __name__ == '__main__':
+    print("Running")
+#    app.config.update(APPLICATION_ROOT='/')
+    try:
+        app.run(host='0.0.0.0', port=80, threaded=True)
+    except:
+        app.run(host='0.0.0.0', threaded=True)
+
+@app.errorhandler(404)
+def page_not_found(error):
+    print('This route does not exist {}'.format(request.url))
+    print(error)
+    return 'This route does not exist {}'.format(request.url), 404
 
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
     if is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
