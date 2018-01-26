@@ -140,6 +140,8 @@ class worker_cmpr(Thread):
                 except:
                     pass
                 break
+        if not self.ser.is_open:
+            time.sleep(1)
     def read_temperatures(self):
         cmd = "$TEA"
         while self.ser.is_open:
@@ -258,9 +260,9 @@ class worker_cmpr(Thread):
             self.open_serial()
         return True
     def turn(self, action):
-        if action == 0:
+        if int(action) == 0:
             return self.do("$OFF")
-        elif action == 1:
+        elif int(action) == 1:
             return self.do("$ON1")
         else:
             print("invalid action:", action)
@@ -356,6 +358,8 @@ class worker_tmpr(Thread):
                     self.ser.write(b'*idn?')
                     self.ser.flush()
                     break
+        if not self.ser.is_open:
+            time.sleep(1)
     def read_temperatures(self):
         for index, letter in zip([0, 1], ['A', 'B']):
             cmd = "rdgst?"
@@ -1201,28 +1205,27 @@ def tmpr_json():
             if len(error) > 0:
                 error += '\n'
             error += tmpr.error_out[index]
-    if 'mode' in tmpr.pid_data and tmpr.pid_data['mode'] != None:
-        return jsonify(temperatures = tmpr.temperatures,
-                       output = tmpr.output,
-                       pid = tmpr.pid_data,
-                       error = error,
-                       rtm = is_realtime_measurement_running)
-    else:
-        return jsonify(temperatures = tmpr.temperatures,
-                       output = tmpr.output,
-                       pid = {
-                           'input':          None,
-                           'mode':           None,
-                           'powerup_enable': None,
-                           'range':          None,
-                           'value':          None,
-                           'P':              None,
-                           'I':              None,
-                           'D':              None,
-                           'manual':         None
-                           },
-                       error = error,
-                       rtm = is_realtime_measurement_running)
+    pid_data = {1: {}, 2: {}}
+    for output in [1, 2]:
+        if 'mode' in tmpr.pid_data[output] and tmpr.pid_data[output]['mode'] != None:
+            pid_data[output] = tmpr.pid_data[output]
+        else:
+            pid_data[output] = {
+                'input':          None,
+                'mode':           None,
+                'powerup_enable': None,
+                'range':          None,
+                'value':          None,
+                'P':              None,
+                'I':              None,
+                'D':              None,
+                'manual':         None
+                },
+    return jsonify(temperatures = tmpr.temperatures,
+                   output = tmpr.output,
+                   pid = pid_data,
+                   error = error,
+                   rtm = is_realtime_measurement_running)
 
 @app.route('/temperature_controller/temperature/A')
 def tmpr_tmpr1():
