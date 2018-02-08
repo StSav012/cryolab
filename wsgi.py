@@ -20,6 +20,7 @@ from collections import Iterable
 import requests
 import numpy as np
 import sounddevice as sd
+import socket
 
 from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
@@ -260,9 +261,9 @@ class worker_cmpr(Thread):
             self.open_serial()
         return True
     def turn(self, action):
-        if int(action) == 0:
+        if repr(action) == '0':
             return self.do("$OFF")
-        elif int(action) == 1:
+        elif repr(action) == '1':
             return self.do("$ON1")
         else:
             print("invalid action:", action)
@@ -684,6 +685,100 @@ class worker_rtm_tmpr(Thread):
 
 tmpr_rtm = worker_rtm_tmpr()
 
+class worker_tcp_emul(Thread):
+    def __init__(self, port=1394):
+        Thread.__init__(self)
+        self.port = port
+        self.daemon = True
+    def run(self):
+#        print('tcp running')
+        while True:
+            try:        
+#                print('connecting')
+                connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#                print('waiting for connection')
+    #            connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                connection.bind(('0.0.0.0', self.port))
+                connection.listen(32)
+#                print('bound to', self.port)
+                while True:
+                    current_connection, address = connection.accept()
+#                    print('accepted from', address)
+                    while True:
+                        data = current_connection.recv(256).decode('ascii').lower()
+#                        print('received', data)
+                        for cmd in data.split(';'):
+#                            print('command:', cmd)
+                            reply = '-1'
+                            cmd = cmd.strip(' :')
+                            if cmd.startswith('krdg? a'):
+                                reply = repr(tmpr.temperatures[0])
+                            elif cmd.startswith('krdg? b'):
+                                reply = repr(tmpr.temperatures[1])
+#                            print('sending', reply)
+                            current_connection.send((reply + '\n').encode('ascii'))
+            except KeyboardInterrupt:
+                connection.shutdown(1)
+                connection.close()
+                sys.exit()
+            except:
+    #            connection.shutdown(1)
+                connection.close()
+                pass
+    #        except:
+    #            pass
+            finally:
+                time.sleep(1)
+
+tcp_emul = worker_tcp_emul()
+
+#class worker_redir(Thread):
+#    def __init__(self, port=5000):
+#        Thread.__init__(self)
+#        self.port = port
+#        self.daemon = True
+#    def run(self):
+##        print('tcp running')
+#        while True:
+#            try:        
+##                print('connecting')
+#                connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+##                print('waiting for connection')
+#    #            connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#                connection.bind(('0.0.0.0', self.port))
+#                connection.listen(1)
+##                print('bound to', self.port)
+#                while True:
+#                    current_connection, address = connection.accept()
+##                    print('accepted from', address)
+#                    while True:
+#                        data = current_connection.recv(256).decode('ascii').lower()
+##                        print('received', data)
+#                        for cmd in data.split(';'):
+##                            print('command:', cmd)
+#                            reply = '-1'
+#                            cmd = cmd.strip(' :')
+#                            if cmd.startswith('krdg? a'):
+#                                reply = repr(tmpr.temperatures[0])
+#                            elif cmd.startswith('krdg? b'):
+#                                reply = repr(tmpr.temperatures[1])
+##                            print('sending', reply)
+#                            current_connection.send((reply + '\n').encode('ascii'))
+#            except KeyboardInterrupt:
+#                connection.shutdown(1)
+#                connection.close()
+#                sys.exit()
+#            except:
+#    #            connection.shutdown(1)
+#                connection.close()
+#                pass
+#    #        except:
+#    #            pass
+#            finally:
+#                time.sleep(1)
+
+# redirector = worker_redir()
+
 trusted_senders = [login.split('#')[0].strip() for login in config['masters']['jabbers'].splitlines()]
 
 class bot(ClientXMPP):
@@ -1062,6 +1157,7 @@ else:
 xmpp.process(block=False)
 cmpr.start()
 tmpr.start()
+tcp_emul.start()
 tmpr_rtm.start()
 
 @app.errorhandler(404)
@@ -1210,17 +1306,8 @@ def tmpr_json():
         if 'mode' in tmpr.pid_data[output] and tmpr.pid_data[output]['mode'] != None:
             pid_data[output] = tmpr.pid_data[output]
         else:
-            pid_data[output] = {
-                'input':          None,
-                'mode':           None,
-                'powerup_enable': None,
-                'range':          None,
-                'value':          None,
-                'P':              None,
-                'I':              None,
-                'D':              None,
-                'manual':         None
-                },
+            for item in ['input', 'mode', 'powerup_enable', 'range', 'value', 'P', 'I', 'D', 'manual']:
+                pid_data[output][item] = None
     return jsonify(temperatures = tmpr.temperatures,
                    output = tmpr.output,
                    pid = pid_data,
