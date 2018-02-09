@@ -323,7 +323,7 @@ class worker_cmpr(Thread):
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 self.communicating = False
-                worker_cmpr().stop()
+                self.stop()
                 sys.exit(0)
 
 class worker_tmpr(Thread):
@@ -724,6 +724,7 @@ class worker_tcp_emul(Thread):
             except KeyboardInterrupt:
                 connection.shutdown(1)
                 connection.close()
+                self.stop()
                 sys.exit()
             except:
     #            connection.shutdown(1)
@@ -736,52 +737,48 @@ class worker_tcp_emul(Thread):
 
 tcp_emul = worker_tcp_emul()
 
-#class worker_redir(Thread):
-#    def __init__(self, port=5000):
-#        Thread.__init__(self)
-#        self.port = port
-#        self.daemon = True
-#    def run(self):
-##        print('tcp running')
-#        while True:
-#            try:        
-##                print('connecting')
-#                connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-##                print('waiting for connection')
-#    #            connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#                connection.bind(('0.0.0.0', self.port))
-#                connection.listen(1)
-##                print('bound to', self.port)
-#                while True:
-#                    current_connection, address = connection.accept()
-##                    print('accepted from', address)
-#                    while True:
-#                        data = current_connection.recv(256).decode('ascii').lower()
-##                        print('received', data)
-#                        for cmd in data.split(';'):
-##                            print('command:', cmd)
-#                            reply = '-1'
-#                            cmd = cmd.strip(' :')
-#                            if cmd.startswith('krdg? a'):
-#                                reply = repr(tmpr.temperatures[0])
-#                            elif cmd.startswith('krdg? b'):
-#                                reply = repr(tmpr.temperatures[1])
-##                            print('sending', reply)
-#                            current_connection.send((reply + '\n').encode('ascii'))
-#            except KeyboardInterrupt:
-#                connection.shutdown(1)
-#                connection.close()
-#                sys.exit()
-#            except:
-#    #            connection.shutdown(1)
-#                connection.close()
-#                pass
-#    #        except:
-#    #            pass
-#            finally:
-#                time.sleep(1)
+class worker_redir(Thread):
+    def __init__(self, port=5000):
+        Thread.__init__(self)
+        self.port = port
+        self.daemon = True
+    def run(self):
+        print("HTTP 302 Redirector is active and listening on port", self.port)
+        while True:
+            try:        
+#                print('connecting')
+                connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#                print('waiting for connection')
+    #            connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                connection.bind(('0.0.0.0', self.port))
+                connection.listen(32)
+#                print('bound to', self.port)
+                current_connection, address = connection.accept()
+#                print('accepted from', address)
+                reply = '''\
+HTTP/1.1 302 Encryption Required
+Location: http://{TARGET}/
+Connection: close
+Cache-control: private
 
-# redirector = worker_redir()
+<html><body>Encryption Required.  Please go to <a href='http://{TARGET}/'>http://{TARGET}/</a> for this service.</body></html>
+'''.format(TARGET = socket.gethostname())
+                current_connection.send(reply.encode('ascii'))
+                current_connection.close()
+            except KeyboardInterrupt:
+                connection.shutdown(1)
+                connection.close()
+                sys.exit()
+            except:
+    #            connection.shutdown(1)
+                connection.close()
+                pass
+    #        except:
+    #            pass
+            finally:
+                time.sleep(1)
+
+redirector = worker_redir()
 
 trusted_senders = [login.split('#')[0].strip() for login in config['masters']['jabbers'].splitlines()]
 
@@ -1385,7 +1382,9 @@ if __name__ == '__main__':
     print("Running")
 #    app.config.update(APPLICATION_ROOT='/')
     try:
+        redirector.start()
         app.run(host='0.0.0.0', port=80, threaded=True)
     except:
+        redirector.stop()
         app.run(host='0.0.0.0', threaded=True)
 
