@@ -140,7 +140,9 @@ class worker_cmpr(Thread):
                     time.sleep(1)           # to be changed
                 except:
                     pass
-                break
+                else:
+                    print(self.ser.port, "opened for the helium compressor")
+                    break
         if not self.ser.is_open:
             time.sleep(1)
     def read_temperatures(self):
@@ -261,12 +263,12 @@ class worker_cmpr(Thread):
             self.open_serial()
         return True
     def turn(self, action):
-        if repr(action) == '0':
+        if int(action) == 0:
             return self.do("$OFF")
-        elif repr(action) == '1':
+        elif int(action) == 1:
             return self.do("$ON1")
         else:
-            print("invalid action:", action)
+            print("invalid action:,", repr(action))
             return False
     def do(self, cmd):
         i = 0
@@ -296,12 +298,14 @@ class worker_cmpr(Thread):
             if resp[0] == "$???":
                 continue
             if len(resp) != 2 or resp[0] != cmd:
-                self.communicating = False
-                return False
+                continue
+#                self.communicating = False
+#                return False
             crc = self.crc16.new(c[:5])
             if crc.hexdigest() != resp[-1][:4]:
-                self.communicating = False
-                return False
+                continue
+#                self.communicating = False
+#                return False
             self.communicating = False
             break
         else:
@@ -355,7 +359,7 @@ class worker_tmpr(Thread):
                     except:
                         pass
                 if self.ser.is_open:
-                    print(port.device + ' opened')
+                    print(port.device, 'opened for the temperature controller')
                     self.ser.write(b'*idn?')
                     self.ser.flush()
                     break
@@ -1271,7 +1275,7 @@ def cmpr_do():
         return "Please wait 'till a measurement is over"
     if get_mac(request.remote_addr) in masters_list:
         try:
-            if cmpr.turn(request.form.get('action')):
+            if cmpr.turn(request.json['action']):
                 return "Command succeeded"
             else:
                 return "Command failed"
