@@ -42,7 +42,7 @@ masters_list = [mac.split('#')[0].strip() for mac in config['masters']['MACs'].s
 cmpr = helium_compressor.worker()
 tmpr = temperature_controller.worker()
 
-pump = vacuum_pump.pump()
+pump = vacuum_pump.worker()
 gauge = pressure_gauge.worker()
 
 tmpr_rtm = temperature_controller.worker_rtm()
@@ -77,10 +77,10 @@ app.url_map.strict_slashes = False
 if not app.debug:
     formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
     handler = TimedRotatingFileHandler('/cryolab/python/logs/wsgi.log', when='midnight', interval=1, backupCount=5)
-    handler.setLevel(logging.DEBUG)
+    handler.setLevel(logging.WARNING)
     handler.setFormatter(formatter)
     log = logging.getLogger('werkzeug')
-    log.setLevel(logging.DEBUG)
+    log.setLevel(logging.WARNING)
     log.addHandler(handler)
     app.logger.addHandler(handler)
 else:
@@ -96,7 +96,8 @@ cmpr.start()
 tmpr.start()
 tcp_emul.start()
 tmpr_rtm.start()
-gauge.start()
+pump.start()
+#gauge.start()
 
 @app.errorhandler(404)
 def page_not_found(error):
@@ -219,6 +220,36 @@ def cmpr_do():
             logging.error("an error occured while processing " + repr(request.json))
             return "Command failed with an error"
     logging.info("someone %s tried to manipulate the compressor", mac)
+    return "Permission denied"
+
+@app.route('/vacuum_pump')
+def pump_index():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('pump.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           pumping_on = pump.is_on())
+
+@app.route('/vacuum_pump/json', methods= ['GET'])
+def pump_json():
+    return jsonify(pumping_on = pump.pumping)
+
+@app.route('/vacuum_pump/do', methods = ['POST'])
+def pump_do():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    mac = get_mac(request.remote_addr)
+    if mac in masters_list:
+        try:
+            if pump.turn(request.json['action']):
+                return "Command succeeded"
+            else:
+                logging.warning("pump failed to process " + repr(request.json))
+                return "Command failed"
+        except:
+            logging.error("an error occured while processing " + repr(request.json))
+            return "Command failed with an error"
+    logging.info("someone %s tried to manipulate the pump", mac)
     return "Permission denied"
 
 @app.route('/temperature_controller')

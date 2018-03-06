@@ -10,8 +10,8 @@ class worker(Thread):
         self.daemon = True
         self.ser = serial.Serial()
         self.pressure = None
-        self.open_serial()
-        self.run()
+#        self.open_serial()
+#        self.run()
     def open_serial(self):
         ports = serial.tools.list_ports.comports()
         for port in ports:
