@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<title>Hello, {% if master_mind %}Master{% else %}World{% endif %} — Pumping Station</title>
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<link rel="mask-icon" href="{{ url_for('static', filename='safari-pinned-tab.svg') }}" color="#5bbad5">
+<meta name="theme-color" content="#ffffff">
+<script type=text/javascript src="{{ url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vacuum_pump.css') }}">
+<script type=text/javascript>
+"use strict";
+var timePeriod = 1000;
+var lastRequestTime = Date();
+var lastResponseTime = Date();
+var plotData = [];
+function update_values() {
+    var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    var now = new Date();
+    if (now - lastRequestTime < 0.9 * timePeriod || now - lastResponseTime < 0.9 * timePeriod) {
+        return;
+    }
+    else {
+        lastRequestTime = now;
+    }
+    $.getJSON($SCRIPT_ROOT+"/vacuum_pump/json",
+        function(data) {
+            now = new Date();
+            if (now - lastResponseTime < 0.9 * timePeriod) {
+                return;
+            }
+            else {
+                lastResponseTime = now;
+            }
+
+            {% if master_mind -%}
+                $("input#on").prop('disabled', (data.pumping_on !== false));
+                $("input#off").prop('disabled', (data.pumping_on !== true));
+            {%- endif %}
+        }
+    );
+}
+setInterval(update_values, timePeriod);
+</script>
+{% if master_mind -%}
+<script type=text/javascript>
+"use strict";
+$(document).ready(function() {
+    $("input#on").click(function() {
+        $.ajax({
+            type: 'post',
+            url: '/vacuum_pump/do',
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                action:          1           // 0 = Off, 1 = On
+            }),
+            success: function(data, status) {
+                alert(data);
+            }
+        });
+    });
+    $("input#off").click(function() {
+        $.ajax({
+            type: 'post',
+            url: '/vacuum_pump/do',
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                action:          0           // 0 = Off, 1 = On
+            }),
+            success: function(data, status) {
+                alert(data);
+            }
+        });
+    });
+});
+</script>
+{%- endif %}
+</head>
+<body>
+{% if master_mind -%}
+<table class="state">
+    <tr>
+        <td class="align_center" colspan="2">
+            <input type="button" class="action_button" id="on" value="Turn pump on!" disabled>
+            <input type="button" class="action_button" id="off" value="Turn pump off!" disabled>
+        </td>
+    </tr>
+</table>
+{%- endif %}
+</body>
+</html>
