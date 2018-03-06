@@ -3,7 +3,7 @@ import sys
 from threading import Thread
 import socket
 
-class worker_tcp_emul(Thread):
+class worker(Thread):
     def __init__(self, temperature_controller=None, port=1394):
         Thread.__init__(self)
         self.port = port

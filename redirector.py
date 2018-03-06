@@ -3,7 +3,7 @@ import sys
 from threading import Thread
 import socket
 
-class worker_redir(Thread):
+class worker(Thread):
     def __init__(self, port=5000):
         Thread.__init__(self)
         self.port = port

@@ -44,8 +44,7 @@ def snd_warning():
         sine_tone(2093.00, 0.2)
         sine_tone(1760.00, 0.2)
 
-
-class worker_tmpr(Thread):
+class worker(Thread):
     def __init__(self):
         Thread.__init__(self)
         self.daemon = True
@@ -343,7 +342,7 @@ class worker_tmpr(Thread):
                 self.stop()
                 sys.exit(0)
 
-class worker_rtm_tmpr(Thread):
+class worker_rtm(Thread):
     def __init__(self):
         Thread.__init__(self)
         self.daemon = True

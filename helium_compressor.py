@@ -5,6 +5,7 @@ import sys
 from threading import Thread
 import crcmod
 import crcmod.predefined
+import sounddevice as sd
 
 def hex2bits(hex_str):
     state = [0 for i in range(len(hex_str) * 4)];
@@ -25,7 +26,27 @@ def hex2bits(hex_str):
         i += 1
     return state
 
-class worker_cmpr(Thread):
+def sine_tone(frequency, duration, volume=1, sample_rate=44100):
+    n_samples = int(sample_rate * duration)
+    t = np.arange(n_samples) / sample_rate
+    sd.play(volume * np.sin(2 * np.pi * frequency * t),
+            samplerate=sample_rate,
+            blocking=True,
+            device='sysdefault')
+
+def snd_notify():
+    for i in range(30):
+        sine_tone(3135.96, 0.2)
+        #sine_tone(2093.00, 0.2)
+        sd.sleep(200)
+
+def snd_warning():
+    for i in range(4):
+        sine_tone(2093.00, 0.2)
+        sine_tone(1760.00, 0.2)
+
+
+class worker(Thread):
     crc16 = crcmod.predefined.Crc('modbus')
     def __init__(self):
         Thread.__init__(self)
