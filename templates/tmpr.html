@@ -612,16 +612,26 @@ function pid_mode_change(output) {
         $("table#pid_ch" + output + " .pid_manual").hide();
     }
 }
+
+function alert_banner(container, duration, data) {
+    container.text(data);
+    container.show();
+    setTimeout(function() { container.hide(); }, duration);
+}
+
 function pid_on(output) {
+    $(".action_button").prop('disabled', true);
     if ($($("table#pid_ch" + output)[0]).is(':hidden')) {
-        alert("Invalid output");
+        alert_banner($("div#banner" + output), 4000, "Invalid output");
+        $(".action_button").prop('disabled', false);
         return;
     }
     var pid_mode = ($("table#pid_ch" + output + " select#pid_mode_list")[0]).value;
     var input_list = $("table#pid_ch" + output + " select#input_list")[0];
     var input = input_list.value;
     if (pid_mode != '3' && (input_list.selectedOptions.length !== 1 || $(input_list.selectedOptions[0]).is(':hidden'))) {
-        alert("Invalid input");
+        alert_banner($("div#banner" + output), 4000, "Invalid input");
+        $(".action_button").prop('disabled', false);
         return;
     }
     var powerup = ($("table#pid_ch" + output + " select#powerup_list")[0]).value;
@@ -649,9 +659,10 @@ function pid_on(output) {
             manual:         +pid_manual  // %
         }),
         success: function(data, status) {
-            alert(data);
+            alert_banner($("div#banner" + output), 4000, data);
         }
     });
+    $(".action_button").prop('disabled', false);
     setCookie("pid_mode" + output,  pid_mode, 30);
     setCookie("powerup" + output,   powerup, 30);
     if (pid_mode != '3') {
@@ -667,6 +678,7 @@ function pid_on(output) {
     }
 }
 function pid_off(output) {
+    $(".action_button").prop('disabled', true);
     $.ajax({
         type: 'post',
         url: '/temperature_controller/pid/do',
@@ -676,9 +688,10 @@ function pid_off(output) {
             output:          output      // 1 or 2
         }),
         success: function(data, status) {
-            alert(data);
+            alert_banner($("div#banner" + output), 4000, data);
         }
     });
+    $(".action_button").prop('disabled', false);
 }
 </script>
 <script type="text/javascript">
@@ -688,7 +701,7 @@ function rtm() {
     var input = input_list.options[input_list.selectedIndex].value;
     var option = $("table#rtm select#input_list option")[input_list.selectedIndex];
     if ($(option).is(':hidden')) {
-        alert("Invalid input");
+        alert_banner($("div#banner_rtm"), 4000, "Invalid input");
         return;
     }
     var count_field = $("table#rtm input#count_field")[0];
@@ -702,7 +715,7 @@ function rtm() {
             count: +count
         }),
         success: function(data, status) {
-            alert(data);
+            alert_banner($("div#banner_rtm"), 4000, data);
         }
     });
     setCookie("rtm_input", input, 30);
@@ -806,6 +819,7 @@ function rtm() {
                         <td class="align_center" colspan=2>
                             <input type="button" class="action_button" onclick="pid_on(1)" value="Turn PID on!">
                             <input type="button" class="action_button" onclick="pid_off(1)" value="Turn PID off!">
+                            <div class="ajax_request_result_banner" id="banner1"></div>
                         </td>
                     </tr>
                 </table>
@@ -889,6 +903,7 @@ function rtm() {
                         <td class="align_center" colspan=2>
                             <input type="button" class="action_button" onclick="pid_on(2)" value="Turn PID on!">
                             <input type="button" class="action_button" onclick="pid_off(2)" value="Turn PID off!">
+                            <div class="ajax_request_result_banner" id="banner2"></div>
                         </td>
                     </tr>
                 </table>
@@ -942,6 +957,7 @@ function rtm() {
         <tr>
             <td class="align_center">
                 <input type="button" class="action_button" id="rtm" onclick="rtm()" value="Start measurements">
+                <div class="ajax_request_result_banner" id="banneri_rtm"></div>
             </td>
             <td>
                 <select id="input_list">

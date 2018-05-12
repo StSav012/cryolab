@@ -44,8 +44,15 @@ setInterval(update_values, timePeriod);
 </script>
 <script type=text/javascript>
 "use strict";
+function alert_banner(container, duration, data) {
+    container.text(data);
+    container.show();
+    setTimeout(function() { container.hide(); }, duration);
+}
+
 $(document).ready(function() {
     $("input#on").click(function() {
+        $(this).prop('disabled', true);
         $.ajax({
             type: 'post',
             url: '/relay_module/do',
@@ -54,11 +61,12 @@ $(document).ready(function() {
                 action:          1           // 0 = Off, 1 = On
             }),
             success: function(data, status) {
-                alert(data);
+                alert_banner($("div#banner"), 4000, data);
             }
         });
     });
     $("input#off").click(function() {
+        $(this).prop('disabled', true);
         $.ajax({
             type: 'post',
             url: '/relay_module/do',
@@ -67,7 +75,7 @@ $(document).ready(function() {
                 action:          0           // 0 = Off, 1 = On
             }),
             success: function(data, status) {
-                alert(data);
+                alert_banner($("div#banner"), 4000, data);
             }
         });
     });
@@ -82,6 +90,7 @@ $(document).ready(function() {
         <td class="align_center">
             <input type="button" class="action_button" id="on" value="Turn relay on!">
             <input type="button" class="action_button" id="off" value="Turn relay off!">
+            <div class="ajax_request_result_banner" id="banner"></div>
         </td>
     </tr>
 </table>

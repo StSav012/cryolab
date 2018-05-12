@@ -125,3 +125,21 @@ button.error.off:disabled {
     background-color: #221111;
 }
 
+div.ajax_request_result_banner {
+    border: bisque solid;
+    border-radius: 0.5em;
+    position: relative;
+    margin-top: -1.7rem;
+    background: antiquewhite;
+    padding: 0.1rem;
+    color: darkred;
+    opacity: 0;
+    display: none;
+    animation: fadeinout 4s linear forwards;
+}
+
+@keyframes fadeinout {
+    12%  { opacity: 1; }
+    88%  { opacity: 1; }
+}
+
