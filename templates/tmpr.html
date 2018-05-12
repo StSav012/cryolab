@@ -144,7 +144,8 @@ function isEmpty(obj) {
 var plotData = [];
 var chart = AmCharts.makeChart("chart", {
   "type": "serial",
-  //"theme": "light",
+  "theme": "light",
+  //"handDrawn": true,
   "marginRight": 40,
   "marginLeft": 40,
   "autoMarginOffset": 20,
@@ -157,31 +158,40 @@ var chart = AmCharts.makeChart("chart", {
     "includeAllValues": true,
     "unit": "K"
   }],
+  "legend": {
+    "enabled": true,
+    "useGraphSettings": true
+  },
   "balloon": {
     "borderThickness": 1,
-    "shadowAlpha": 0
+    "shadowAlpha": 0,
+    "pointerOrientation": "down"
   },
   "graphs": [{
     "id": "temperatureA",
+    "title": "A",
     "balloon": {
-      "drop": true,
+      "drop": false,
       "animationDuration": 0
     },
     "bullet": "none",
     "lineThickness": 2,
     "valueField": "temperature1",
-    "balloonText": "<span style='font-size:18px;'>[[value]] K</span>"
+    "balloonText": "<span>T<sub>[[title]]</sub> = [[value]] K</span>",
+    "lineColor": "red"
   },
   {
     "id": "temperatureB",
+    "title": "B",
     "balloon": {
-      "drop": true,
+      "drop": false,
       "animationDuration": 0
     },
     "bullet": "none",
     "lineThickness": 2,
     "valueField": "temperature2",
-    "balloonText": "<span style='font-size:18px;'>[[value]] K</span>"
+    "balloonText": "<span>T<sub>[[title]]</sub> = [[value]] K</span>",
+    "lineColor": "blue"
   }],
   "chartScrollbar": {
     "oppositeAxis": false,
@@ -320,21 +330,24 @@ var chart = AmCharts.makeChart("chart", {
 });
 chart.isZoomed = false;
 chart.ignoreZoomed = true;
+var chart_zoomOffset = 0;
 chart.addListener("zoomed", function(event) {
     if (chart.ignoreZoomed) {
         chart.ignoreZoomed = false;
         return;
     }
     chart.isZoomed = (event.endIndex - event.startIndex < event.chart.dataProvider.length - 1);
-    chart.zoomStart = event.startIndex;
-    chart.zoomEnd = event.endIndex;
+    chart.zoomStart = event.startDate;
+    chart.zoomEnd = event.endDate;
+    chart_zoomOffset = chart.lastTime - event.endDate;
 });
 
 chart.addListener("dataUpdated", function(event) {
     if (!chart.isZoomed) {
         return;
     }
-    chart.zoomToIndexes(chart.zoomStart + 1, chart.zoomEnd + 2);
+    chart.zoomToDates(new Date(chart.lastTime - chart_zoomOffset - (chart.zoomEnd - chart.zoomStart)),
+                      new Date(chart.lastTime - chart_zoomOffset));
 });
 /******************************************************************************/
 var timePeriod = 1000;
@@ -382,7 +395,12 @@ function update_values() {
                     if (data.temperatures[i] !== "None" &&
                         data.temperatures[i] !== "" &&
                         data.temperatures[i] !== null) {
-                            $("#temperature" + (i+1)).text(data.temperatures[i]);
+                            if (Math.abs(data.temperatures[i]) < 100.) {
+                                $("#temperature" + (i+1)).text(data.temperatures[i].toFixed(3));
+                            }
+                            else {
+                                $("#temperature" + (i+1)).text(data.temperatures[i].toFixed(2));
+                            }
                             key = "temperature" + (i+1);
                             dict[key] = data.temperatures[i];
                             in_ok = true;
@@ -431,8 +449,22 @@ function update_values() {
                     if (displayedLength > maxLength) {
                         chart.dataProvider = [];
                         var denom = displayedLength / maxLength;
-                        for (i = 0; Math.round(i) < plotData.length; i += denom) {
-                            chart.dataProvider.push(plotData[Math.round(i)]);
+                        for (i = denom/2.; Math.round(i) < plotData.length - denom/2.; i += denom) {
+                            var j, k;
+                            var dict1 = {};
+                            dict1.time = plotData[Math.round(i)].time;
+                            for (j = 0; j < 2; j += 1) {
+                                var key;
+                                var s;
+                                key = "temperature" + (j+1);
+                                s = 0.;
+                                for (k = -denom/2.; k < denom/2. && plotData.length > Math.round(i+k) && Math.round(i+k) >= 0; k += 1) {
+                                    s += plotData[Math.round(i + k)][key];
+                                }
+                                s /= denom/2. + k;
+                                dict1[key] = +s.toFixed(3);
+                            }
+                            chart.dataProvider.push(dict1);
                         }
                     }
                     else {

@@ -96,8 +96,8 @@ function update_values() {
                 }
             {% endfor %}
             {% if master_mind -%}
-                $("input#on").prop('disabled', (data.system_on === true));
-                $("input#off").prop('disabled', (data.system_on === false));
+                $("input#on").prop('disabled', (data.system_on !== false));
+                $("input#off").prop('disabled', (data.system_on !== true));
             {%- endif %}
         }
     );

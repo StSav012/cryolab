@@ -10,9 +10,11 @@ class worker(Thread):
         self.daemon = True
         self.ser = serial.Serial()
         self.pressure = None
+        self.communicating = False
 #        self.open_serial()
 #        self.run()
     def open_serial(self):
+        self.communicating = False
         ports = serial.tools.list_ports.comports()
         for port in ports:
             if port.description == "ttyAMA0":
@@ -33,14 +35,23 @@ class worker(Thread):
                     print('gauge at', port.device, 'opened')
                     break
     def read_pressure(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("pressure gauge is very busy")
+                return None
         cmd = "001M^"
         msg = cmd + "\r"
-        print("reading pressure from", self.ser.port)
+#        print("reading pressure from", self.ser.port)
         while self.ser.is_open:
             try:
+                self.communicating = True
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 resp = self.ser.readline().decode("ascii")
+                self.communicating = False
             except:
                 continue
             # debug
@@ -74,8 +85,8 @@ class worker(Thread):
                 print("invalid checksum:", cks)
                 continue
             self.pressure = value
-            if self.pressure:
-                print("Pressure:", self.pressure)
+#            if self.pressure:
+#                print("Pressure:", self.pressure)
             break
         else:
             self.open_serial()
@@ -87,7 +98,8 @@ class worker(Thread):
                 self.read_pressure()
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
+                print('caught ctrl+c')
                 print("pressure gauge stopped")
-#                worker_gauge().stop()
+                self.join()
                 sys.exit(0)
 

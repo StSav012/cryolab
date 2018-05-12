@@ -1,20 +1,7 @@
-{% macro watch(title, id, value, unit='', default='<b>??</b>') -%}
-    <tr>
-        <td>{{ title }}</td>
-        <td id="{{ id }}" class="align_right large">
-        {% if value %}
-            {{ value }}
-        {% else %}
-            {{ default|safe }}
-        {% endif %}
-        </td>
-        <td>{{ unit }}</td>
-    </tr>
-{%- endmacro %}
 <!doctype html>
 <html>
 <head>
-<title>Hello, {% if master_mind %}Master{% else %}World{% endif %} — Pumping Station</title>
+<title>Hello, {% if master_mind %}Master{% else %}World{% endif %} — Relay Module</title>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
 <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
 <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
@@ -22,7 +9,8 @@
 <link rel="mask-icon" href="{{ url_for('static', filename='safari-pinned-tab.svg') }}" color="#5bbad5">
 <meta name="theme-color" content="#ffffff">
 <script type=text/javascript src="{{ url_for('static', filename='jquery-3.2.1.min.js') }}"></script>
-<link rel="stylesheet" href="{{ url_for('static', filename='vacuum_pump.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='relay_module.css') }}">
+{% if master_mind -%}
 <script type=text/javascript>
 "use strict";
 var timePeriod = 1000;
@@ -37,7 +25,7 @@ function update_values() {
     else {
         lastRequestTime = now;
     }
-    $.getJSON($SCRIPT_ROOT+"/vacuum_pump/json",
+    $.getJSON($SCRIPT_ROOT+"/relay_module/json",
         function(data) {
             now = new Date();
             if (now - lastResponseTime < 0.9 * timePeriod) {
@@ -47,32 +35,20 @@ function update_values() {
                 lastResponseTime = now;
             }
 
-            if (data.speed != null &&
-                data.speed != "None" &&
-                data.speed !== "") {
-                $("#speed").text(data.speed);
-            }
-            else {
-                $("#speed").html("<b>??</b>");
-            }
-            
-            {% if master_mind -%}
-                $("input#on").prop('disabled', (data.pumping_on !== false));
-                $("input#off").prop('disabled', (data.pumping_on !== true));
-            {%- endif %}
+            $("input#on").prop('disabled', (data.relay_on === true));
+            $("input#off").prop('disabled', (data.relay_on === false));
         }
     );
 }
 setInterval(update_values, timePeriod);
 </script>
-{% if master_mind -%}
 <script type=text/javascript>
 "use strict";
 $(document).ready(function() {
     $("input#on").click(function() {
         $.ajax({
             type: 'post',
-            url: '/vacuum_pump/do',
+            url: '/relay_module/do',
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({
                 action:          1           // 0 = Off, 1 = On
@@ -85,7 +61,7 @@ $(document).ready(function() {
     $("input#off").click(function() {
         $.ajax({
             type: 'post',
-            url: '/vacuum_pump/do',
+            url: '/relay_module/do',
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({
                 action:          0           // 0 = Off, 1 = On
@@ -100,16 +76,15 @@ $(document).ready(function() {
 {%- endif %}
 </head>
 <body>
-<table class="state">
-    {{ watch(title='Speed:', id='speed', value=speed, unit='rpm') }}
 {% if master_mind -%}
+<table class="state">
     <tr>
-        <td class="align_center" colspan="3">
-            <input type="button" class="action_button" id="on" value="Turn pump on!" disabled>
-            <input type="button" class="action_button" id="off" value="Turn pump off!" disabled>
+        <td class="align_center">
+            <input type="button" class="action_button" id="on" value="Turn relay on!">
+            <input type="button" class="action_button" id="off" value="Turn relay off!">
         </td>
     </tr>
-{%- endif %}
 </table>
+{%- endif %}
 </body>
 </html>

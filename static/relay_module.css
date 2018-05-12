@@ -35,14 +35,6 @@ table.centered {
     margin-right: auto;
 }
 
-table.wide {
-    width: 100%;
-}
-
-table.fixed {
-    table-layout: fixed;
-}
-
 table.state > tr > td {
     padding: 5pt;
     border-radius: 14pt;

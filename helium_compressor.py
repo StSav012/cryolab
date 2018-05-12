@@ -72,6 +72,7 @@ class worker(Thread):
         self.system_on = None
 #        self.open_serial()
     def open_serial(self):
+        self.communicating = False
         ports = serial.tools.list_ports.comports()
         for port in ports:
             if port.description == "ttyAMA0":
@@ -90,19 +91,31 @@ class worker(Thread):
                     pass
                 else:
                     print(self.ser.port, "opened for the helium compressor")
+                    self.communicating = False
                     break
         if not self.ser.is_open:
             time.sleep(1)
     def read_temperatures(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("compressor is very busy")
+                return False
         cmd = "$TEA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
+                self.communicating = True
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 c = self.ser.read(26)
+                self.ser.flush()
+                self.communicating = False
             except:
+                self.communicating = False
                 continue
             # debug
             if len(c) == 0:
@@ -115,12 +128,12 @@ class worker(Thread):
                 continue
             if len(resp) != 6 or resp[0] != cmd:
                 self.temperatures = [None, None, None, None]
-                print('wrong response: ' + c.decode("ascii"))
+                print('wrong response:', c)
                 return False
             crc = self.crc16.new(c[:21])
             if crc.hexdigest() != resp[-1][:4]:
                 self.temperatures = [None, None, None, None]
-                print('wrong crc: ' + c.decode("ascii"))
+                print('wrong crc:', c)
                 return False
             for i in range(len(self.temperatures)):
                 self.temperatures[i] = int(resp[i+1])
@@ -129,15 +142,26 @@ class worker(Thread):
             self.open_serial()
         return True
     def read_pressures(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("compressor is very busy")
+                return False
         cmd = "$PRA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
+                self.communicating = True
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 c = self.ser.read(18)
+                self.ser.flush()
+                self.communicating = False
             except:
+                self.communicating = False
                 continue
             # debug
             if len(c) == 0:
@@ -162,15 +186,26 @@ class worker(Thread):
             self.open_serial()
         return True
     def read_status(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("compressor is very busy")
+                return False
         cmd = "$STA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
             msg = cmd + crc.hexdigest() + '\r'
             try:
+                self.communicating = True
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 c = self.ser.read(15)
+                self.ser.flush()
+                self.communicating = False
             except:
+                self.communicating = False
                 continue
             # debug
             if len(c) == 0:
@@ -234,6 +269,7 @@ class worker(Thread):
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
                 c = self.ser.read(10)
+                self.ser.flush()
             except:
                 continue
             # debug
@@ -263,14 +299,13 @@ class worker(Thread):
     def run(self):
         while True:
             try:
-                self.communicating = True
                 self.read_temperatures()
                 self.read_pressures()
                 self.read_status()
-                self.communicating = False
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 self.communicating = False
-                self.stop()
+                print('caught ctrl+c')
+                self.join()
                 sys.exit(0)
 

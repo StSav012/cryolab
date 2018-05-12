@@ -25,7 +25,7 @@ class worker(Thread):
 #                    print('accepted from', address)
                     while True:
                         data = current_connection.recv(256).decode('ascii').lower()
-#                        print('received', data)
+                        print(time.time(), 'received', data)
                         for cmd in data.split(';'):
 #                            print('command:', cmd)
                             reply = '-1'
@@ -34,12 +34,14 @@ class worker(Thread):
                                 reply = repr(self.tmpr.temperatures[0])
                             elif self.tmpr and cmd.startswith('krdg? b'):
                                 reply = repr(self.tmpr.temperatures[1])
-#                            print('sending', reply)
+                            print(time.time(), 'sending', reply)
                             current_connection.send((reply + '\n').encode('ascii'))
-            except KeyboardInterrupt:
+                            print(time.time(), 'done')
+            except (KeyboardInterrupt, SystemExit):
                 connection.shutdown(1)
                 connection.close()
-                self.stop()
+                print('caught ctrl+c')
+                self.join()
                 sys.exit()
             except:
     #            connection.shutdown(1)

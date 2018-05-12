@@ -5,36 +5,35 @@ import sys
 from threading import Thread
 
 class worker(Thread):
-    true = 0x31
-    false = 0x30
-    parameter_pump_on = b'000'
-    parameter_status = b'205'
-    parameter_speed_hz = b'203'
+    true = '1' * 6
+    false = '0' * 6
+    parameter_pump_on = 10
+    parameter_speed_rpm = 398
     def __init__(self):
         Thread.__init__(self)
         self.ser = serial.Serial()
-        self.address = 0
+        self.address = 1
         self.pumping = None
         self.speed = None
         self.communicating = False
         self.daemon = True
 #        self.open_serial()
     def checksum(self, cmd):
-        csk = cmd[1]
-        for c in cmd[2:]:
-            csk ^= c
-        return format(csk, 'X').encode('ascii')
-    def make_cmd(self, cmd_code, payload = b''):
-        if len(cmd_code) != 3:
-            # print('incorrect command code:', cmd_code)
+        csk = 0
+        for c in cmd.encode('ascii'):
+            csk += c
+        return csk % 256
+    def make_cmd(self, cmd_code, payload = '=?'):
+        cmd  = ('%03d' % self.address)
+        cmd += ('0' if payload == '=?' else '1') + '0'
+        cmd += ('%03d' % cmd_code)
+        cmd += ('%02d' % len(payload))
+        if len(cmd) != 10:
+            print('incorrect command forming:', cmd)
             return None
-        cmd  = bytes([0x02])
-        cmd += bytes([0x80 + self.address])
-        cmd += cmd_code
-        cmd += bytes([self.true if payload else self.false])
         cmd += payload
-        cmd += bytes([0x03])
-        cmd += self.checksum(cmd)
+        cmd += ('%03d' % self.checksum(cmd))
+        cmd += '\r'
         return cmd
     def open_serial(self):
         self.communicating = False
@@ -66,29 +65,30 @@ class worker(Thread):
             time.sleep(0.1)
             i += 1
             if i > 30:      # wait for 3 seconds at most
-                # print("pump is very busy")
+                print("pump is very busy")
                 return None
-        msg = self.make_cmd(parameter, bytes([self.true if value else self.false]))
+        msg = self.make_cmd(parameter, (self.true if value else self.false))
         if self.ser.is_open:
             try:
                 self.communicating = True
-                self.ser.write(msg)
+                self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
-                time.sleep(1 if self.ser.timeout is None else self.ser.timeout)
-                resp = self.ser.read(6)
-                self.ser.flush()
+                time.sleep(self.ser.timeout)
+                resp = self.ser.readline().strip(b'\xff')[:20]
                 self.communicating = False
-                # print('response:', resp)
-                # check for validity
-                if len(resp) != 6 or self.checksum(resp[:-2]) != resp[-2:]:
-                    # print('incorrect response', resp, 'to', msg)
-                    return None
-                elif resp[2] == 6:
-                    # print('request acknowledged')
+#                print('response:', resp)
+                resp = resp.decode("ascii")
+                # check for validity: the response should match the command
+                if resp == msg:
+#                    print('request understood')
                     return True
-                else:
-                    # print('the pump returned code', hex(resp[2]), 'as a response to', msg)
+                elif resp[10:16] in ['NO_DEF', '_RANGE', '_LOGIC']:
+                    print('the pump returned an error:', resp[10:16])
+                    print('as a response to', msg)
                     return False
+                else:
+                    print('incorrect response:', resp.encode('ascii'))
+                    return None
             except:
                 try:
                     self.ser.close()
@@ -112,24 +112,29 @@ class worker(Thread):
         if self.ser.is_open:
             try:
                 self.communicating = True
-                self.ser.write(msg)
+                self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
-                time.sleep(1 if self.ser.timeout is None else self.ser.timeout)
-                resp = self.ser.read(10)
-                self.ser.flush()
+                time.sleep(self.ser.timeout)
+                resp = self.ser.readline().strip(b'\xff')[:20]
                 self.communicating = False
                 # check for validity: checksum and value
-                # print('response:', resp)
-                if len(resp) == 6 and self.checksum(resp[:-2]) == resp[-2:]:
-                    # print('command', msg, 'failed with code', hex(resp[2]))
+#                print('response:', resp)
+                if len(resp) != 20:
+#                    print('incorrect response:', resp)
                     return None
-                if len(resp) != 10 or resp[:6] != msg[:6] or self.checksum(resp[:-2]) != resp[-2:]:
-                    # print('incorrect response', resp, 'to', msg)
+                resp = resp.decode("ascii").splitlines()[0]
+                if self.checksum(resp[:16]) != int(resp[16:19]):
+#                    print('incorrect response:', resp)
                     return None
-                if resp[6] in [self.true, self.false]:
-                    return resp[6] == self.true
+                if resp[10:16] in [self.true, self.false]:
+#                    print('response:', resp.encode('ascii'))
+                    return resp[10:16] == self.true
+                elif resp[10:16] in ['NO_DEF', '_RANGE', '_LOGIC']:
+                    print('the pump returned an error:', resp[10:16])
+                    print('as a response to', msg)
+                    return None
                 else:
-                    # print('incorrect response', resp, 'to', msg)
+                    print('incorrect response:', resp.encode('ascii'))
                     return None
             except:
                 try:
@@ -154,25 +159,29 @@ class worker(Thread):
         if self.ser.is_open:
             try:
                 self.communicating = True
-                self.ser.write(msg)
+                self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
-                time.sleep(1 if self.ser.timeout is None else self.ser.timeout)
-                resp = self.ser.read(15)
-                self.ser.flush()
+                time.sleep(self.ser.timeout)
+                resp = self.ser.readline().strip(b'\xff')[:20]
                 self.communicating = False
                 # check for validity: checksum and value
-                # print('response:', resp)
-                if len(resp) == 6 and self.checksum(resp[:-2]) == resp[-2:]:
-                    # print('command', msg, 'failed with code', hex(resp[2]))
+#                print('response:', resp)
+                if len(resp) != 20:
+#                    print('incorrect response:', resp)
                     return None
-                if len(resp) != 15 or resp[:6] != msg[:6] or self.checksum(resp[:-2]) != resp[-2:]:
-                    # print('incorrect response', resp, 'to', msg)
+                resp = resp.decode("ascii").splitlines()[0]
+                if self.checksum(resp[:16]) != int(resp[16:19]):
+#                    print('incorrect response:', resp)
+                    return None
+                if resp[10:16] in ['NO_DEF', '_RANGE', '_LOGIC']:
+                    print('the pump returned an error:', resp[10:16])
+                    print('as a response to', msg)
                     return None
                 else:
                     try:
-                        return int(resp[6:12])
+                        return int(resp[10:16])
                     except:
-                        # print('incorrect response', resp, 'to', msg)
+                        print('incorrect response:', resp.encode('ascii'))
                         return None
             except:
                 try:
@@ -189,18 +198,16 @@ class worker(Thread):
         return self.set_bool(self.parameter_pump_on, turn_on)
 
     def is_on(self):
-        return self.get_bool(self.parameter_pump_on) and self.get_int6(self.parameter_status) in [2, 5]
+        return self.get_bool(self.parameter_pump_on)
 
-    def get_speed_hz(self):
-        return self.get_int6(self.parameter_speed_hz)
+    def get_speed_rpm(self):
+        return self.get_int6(self.parameter_speed_rpm)
 
     def run(self):
         while True:
             try:
                 self.pumping = self.is_on()
-                self.speed = self.get_speed_hz()
-                if self.speed:
-                    self.speed *= 60.
+                self.speed = self.get_speed_rpm()
                 time.sleep(1 if self.ser.timeout is None else self.ser.timeout)
             except (KeyboardInterrupt, SystemExit):
                 print('caught ctrl+c')

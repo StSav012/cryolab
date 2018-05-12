@@ -31,9 +31,11 @@ Cache-control: private
 '''.format(TARGET = socket.gethostname())
                 current_connection.send(reply.encode('ascii'))
                 current_connection.close()
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, SystemExit):
+                print('caught ctrl+c')
                 connection.shutdown(1)
                 connection.close()
+                self.join()
                 sys.exit()
             except:
     #            connection.shutdown(1)

@@ -25,7 +25,7 @@ function update_values() {
             iframe.contentWindow.document &&
             iframe.contentWindow.document.body &&
             iframe.contentWindow.document.body.parentNode) {
-            if (iframe.contentWindow.document.body.parentNode.scrollHeight) {
+            if (iframe.contentWindow.document.body.parentNode.clientHeight) {
                 iframe.height = iframe.contentWindow.document.body.parentNode.scrollHeight;
             }
         }
@@ -36,27 +36,35 @@ setInterval(update_values, timePeriod);
 </head>
 <body>
 <table class="centered wide">
-<tr>
-<td class="wide">
-    <input type="checkbox" id="checkbox-0" class="accordion" checked />
-    <label for="checkbox-0">Pumping Station State</label>
-    <iframe src="vacuum_pump" class="wide"></iframe>
-</td>
-</tr>
-<tr>
-<td class="wide">
-    <input type="checkbox" id="checkbox-1" class="accordion" checked />
-    <label for="checkbox-1">Compressor State</label>
-    <iframe src="helium_compressor" class="wide"></iframe>
-</td>
-</tr>
-<tr>
-<td class="wide">
-    <input type="checkbox" id="checkbox-2" class="accordion" checked />
-    <label for="checkbox-2">Cold Plate State</label>
-    <iframe src="temperature_controller" class="wide"></iframe>
-</td>
-</tr>
+    <tr>
+        <td class="wide">
+            <input type="checkbox" id="checkbox-6" class="accordion" checked />
+            <label for="checkbox-6">Mains Power Relay State</label>
+            <iframe src="relay_module" class="wide" height="51"></iframe>
+        </td>
+    </tr>
+    <tr>
+        <td class="wide">
+            <input type="checkbox" id="checkbox-0" class="accordion" checked />
+            <label for="checkbox-0">Vacuum Pumping Station State</label>
+            <iframe src="vacuum_pump" class="wide" height="51"></iframe>
+            <iframe src="pressure_gauge" class="wide" height="51"></iframe>
+        </td>
+    </tr>
+    <tr>
+        <td class="wide">
+            <input type="checkbox" id="checkbox-1" class="accordion" checked />
+            <label for="checkbox-1">Compressor State</label>
+            <iframe src="helium_compressor" class="wide" height="51"></iframe>
+        </td>
+    </tr>
+    <tr>
+        <td class="wide">
+            <input type="checkbox" id="checkbox-2" class="accordion" checked />
+            <label for="checkbox-2">Cold Plate State</label>
+            <iframe src="temperature_controller" class="wide" height="51"></iframe>
+        </td>
+    </tr>
 </table>
 
 <p id="time" onclick="loadJoke('#time + div');"></p>

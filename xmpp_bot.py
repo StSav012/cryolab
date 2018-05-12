@@ -8,6 +8,8 @@ class bot(ClientXMPP):
     def __init__(self, jid, password):
         ClientXMPP.__init__(self, jid, password)
 
+        self.use_signals(signals=['SIGHUP', 'SIGTERM', 'SIGINT'])
+
         self.add_event_handler("session_start", self.session_start)
         self.add_event_handler("message", self.message)
         self.add_event_handler("disconnected", self.disconnected)
@@ -342,14 +344,17 @@ water in: %d°C''' % (self.helium_compressor.temperatures[0],
                             reply = "You are not authorized."
                             logging.info('%s tried to manipulate' % sender)
                             print('%s tried to manipulate' % sender)
+            except (KeyboardInterrupt, SystemExit):
+                print('caught ctrl+c')
+                sys.exit()
             except:
-                # print('error:', sys.exc_info())
+                print('error:', sys.exc_info())
                 pass
             msg.reply(reply).send()
 
     def disconnected(self, data):
         logging.warning('XMPP disconnected')
         print('XMPP disconnected')
-        self.disconnect(reconnect=True, send_close=False)
-        logging.warning('trying to re-connect XMPP')
+#        self.disconnect(reconnect=True, send_close=False)
+#        logging.warning('trying to re-connect XMPP')
 

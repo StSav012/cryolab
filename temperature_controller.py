@@ -59,6 +59,7 @@ class worker(Thread):
         self.error_out_sounded = [False, False]
 #        self.open_serial()
     def open_serial(self):
+        self.communicating = False
         ports = serial.tools.list_ports.comports()
         for port in ports:
             if port.description == "ttyAMA0":
@@ -143,7 +144,7 @@ class worker(Thread):
                             r -= 1
                         if r != 0:
                             self.error_in[index] = "Unknown temperature reading error for " + letter
-                        app.logger.warning(self.error_in[index])
+                        # app.logger.warning(self.error_in[index])
                         if not self.error_in_sounded[index]:
                             snd_warning()
                             self.error_in_sounded[index] = True
@@ -185,7 +186,7 @@ class worker(Thread):
                             self.error_out[index] = "Heater short for " + letter
                         else:
                             self.error_out[index] = "Unknown output state reading error for " + letter
-                        app.logger.warning(self.error_out[index])
+                        # app.logger.warning(self.error_out[index])
                         if not self.error_out_sounded[index]:
                             snd_warning()
                             self.error_out_sounded[index] = True
@@ -336,10 +337,11 @@ class worker(Thread):
                 else:
                     self.temperatures = [None, None]
                     self.output = [None, None]
-                time.sleep(1)
+                time.sleep(0.1)
             except (KeyboardInterrupt, SystemExit):
+                print('caught ctrl+c')
                 self.communicating = False
-                self.stop()
+                self.join()
                 sys.exit(0)
 
 class worker_rtm(Thread):
@@ -395,10 +397,17 @@ class worker_rtm(Thread):
     def fire(self):
         self.paused = False
     def run(self):
-        while True:
-            if not self.paused:
-                self.measure()
-                self.paused = True
-            else:
-                time.sleep(0.1)
+        try:
+            while True:
+                if not self.paused:
+                    self.measure()
+                    self.paused = True
+                else:
+                    time.sleep(0.1)
+        except (KeyboardInterrupt, SystemExit):
+            print('caught ctrl+c')
+            self.ser.close()
+            self.join()
+            sys.exit()
+
 

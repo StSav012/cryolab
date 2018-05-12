@@ -19,6 +19,7 @@ import helium_compressor
 import temperature_controller
 import vacuum_pump
 import pressure_gauge
+import relay_module
 import xmpp_bot
 import tcp_emul
 import redirector
@@ -27,7 +28,7 @@ def get_mac(ip):
     mac = None
     try:
         cmd = "arping -f -I wlan0 " + ip
-        result = Popen(cmd, shell=True, stdout=PIPE)
+        result = Popen(cmd, stdout=PIPE, shell=True)
         mac = result.stdout.readlines()[1].decode('ascii').split()[-2][1:-1]
         print(mac)
     except:
@@ -42,6 +43,7 @@ masters_list = [mac.split('#')[0].strip() for mac in config['masters']['MACs'].s
 cmpr = helium_compressor.worker()
 tmpr = temperature_controller.worker()
 
+relay = relay_module.worker()
 pump = vacuum_pump.worker()
 gauge = pressure_gauge.worker()
 
@@ -51,23 +53,23 @@ tcp_emul = tcp_emul.worker(temperature_controller = tmpr)
 
 redirector = redirector.worker()
 
-xmpp = xmpp_bot.bot(config['XMPP']['jid'], config['XMPP']['pass'])
-# xmpp.register_plugin('xep_0030') # Service Discovery
-# xmpp.register_plugin('xep_0004') # Data Forms
-# xmpp.register_plugin('xep_0060') # PubSub
-# xmpp.register_plugin('xep_0199') # XMPP Ping
-                
-xmpp.use_proxy = True
-xmpp.proxy_config = {
-    'host': config['proxy']['host'],
-    'port': int(config['proxy']['port']),
-    'username': config['proxy']['username'],
-    'password': config['proxy']['password']
-}
-
-xmpp.trusted_senders = [login.split('#')[0].strip() for login in config['masters']['jabbers'].splitlines()]
-xmpp.helium_compressor = cmpr
-xmpp.temperature_controller = tmpr
+# xmpp = xmpp_bot.bot(config['XMPP']['jid'], config['XMPP']['pass'])
+# # xmpp.register_plugin('xep_0030') # Service Discovery
+# # xmpp.register_plugin('xep_0004') # Data Forms
+# # xmpp.register_plugin('xep_0060') # PubSub
+# # xmpp.register_plugin('xep_0199') # XMPP Ping
+#                 
+# xmpp.use_proxy = True
+# xmpp.proxy_config = {
+#     'host': config['proxy']['host'],
+#     'port': int(config['proxy']['port']),
+#     'username': config['proxy']['username'],
+#     'password': config['proxy']['password']
+# }
+# 
+# xmpp.trusted_senders = [login.split('#')[0].strip() for login in config['masters']['jabbers'].splitlines()]
+# xmpp.helium_compressor = cmpr
+# xmpp.temperature_controller = tmpr
 
 print("Starting")
 
@@ -86,18 +88,19 @@ if not app.debug:
 else:
     logging.basicConfig(level=logging.DEBUG)
 
-if xmpp.connect((config['XMPP']['server'], int(config['XMPP']['port']))):
-    print("XMPP connected")
-else:
-    print("XMPP connection failed")
+# if xmpp.connect((config['XMPP']['server'], int(config['XMPP']['port']))):
+#     print("XMPP connected")
+# else:
+#     print("XMPP connection failed")
 
-xmpp.process(block=False)
+# xmpp.process(block=False)
+relay.start()
 cmpr.start()
 tmpr.start()
 tcp_emul.start()
 tmpr_rtm.start()
 pump.start()
-#gauge.start()
+gauge.start()
 
 @app.errorhandler(404)
 def page_not_found(error):
@@ -222,17 +225,46 @@ def cmpr_do():
     logging.info("someone %s tried to manipulate the compressor", mac)
     return "Permission denied"
 
+@app.route('/relay_module')
+def relay_index():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('relay.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           relay_on = relay.is_on)
+
+@app.route('/relay_module/json', methods= ['GET'])
+def relay_json():
+    return jsonify(relay_on = relay.is_on)
+
+@app.route('/relay_module/do', methods = ['POST'])
+def relay_do():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    mac = get_mac(request.remote_addr)
+    if mac in masters_list:
+        try:
+            relay.is_on = (request.json['action'] not in [0, False])
+            return "Command succeeded"
+        except:
+            logging.error("an error occured while processing " + repr(request.json))
+            return "Command failed with an error"
+    logging.info("someone %s tried to manipulate the pump", mac)
+    return "Permission denied"
+
 @app.route('/vacuum_pump')
 def pump_index():
     if temperature_controller.is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
     return render_template('pump.html',
                            master_mind = (get_mac(request.remote_addr) in masters_list),
-                           pumping_on = pump.is_on())
+                           pumping_on = pump.pumping,
+                           speed = pump.speed)
 
 @app.route('/vacuum_pump/json', methods= ['GET'])
 def pump_json():
-    return jsonify(pumping_on = pump.pumping)
+    return jsonify(pumping_on = pump.pumping,
+                   speed = pump.speed)
 
 @app.route('/vacuum_pump/do', methods = ['POST'])
 def pump_do():
@@ -251,6 +283,17 @@ def pump_do():
             return "Command failed with an error"
     logging.info("someone %s tried to manipulate the pump", mac)
     return "Permission denied"
+
+@app.route('/pressure_gauge')
+def gauge_index():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('gauge.html',
+                           pressure = gauge.pressure)
+
+@app.route('/pressure_gauge/json', methods= ['GET'])
+def gauge_json():
+    return jsonify(pressure = gauge.pressure)
 
 @app.route('/temperature_controller')
 def tmpr_index():
@@ -317,9 +360,11 @@ def tmpr_do():
 def joke():
     if temperature_controller.is_realtime_measurement_running:
         return ""
-    url = 'http://www.laughfactory.com/joke/loadmorejokes';
+    url = 'http://www.laughfactory.com/joke/loadmorejokes'
+    proxies = {"http": "{host}:{port}".format(host=config['proxy']['host'], port=config['proxy']['port'])}
+    auth = requests.auth.HTTPProxyAuth(config['proxy']['username'], config['proxy']['password'])
     try:
-        r = requests.get(url, params=request.args, timeout=1)
+        r = requests.get(url, params=request.args, timeout=1, proxies=proxies, auth=auth)
         return r.text
     except:
         return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
@@ -356,6 +401,8 @@ if __name__ == '__main__':
     try:
         redirector.start()
         app.run(host='0.0.0.0', port=80, threaded=True)
+    except (KeyboardInterrupt, SystemExit):
+        print('caught ctrl+c')
     except:
         redirector.stop()
         app.run(host='0.0.0.0', threaded=True)

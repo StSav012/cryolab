@@ -19,12 +19,14 @@ input.accordion + label {
 input.accordion:checked + label {
     border-radius: 12pt 12pt 0 0;
 }
+input.accordion + label + iframe + iframe,
 input.accordion + label + iframe {
     display: none;
     padding: 0;
     /*border-radius: 0 0 1rem 1rem;*/
     border: none;
 }
+input.accordion:checked + label + iframe + iframe,
 input.accordion:checked + label + iframe {
     display: inline;
 }
