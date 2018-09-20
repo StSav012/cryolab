@@ -10,6 +10,7 @@ import os
 from IPy import IP
 from subprocess import Popen, PIPE
 import requests
+from collections import Iterable
 
 from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
@@ -23,6 +24,22 @@ import relay_module
 import xmpp_bot
 import tcp_emul
 import redirector
+
+def csv(data, sep = '\t'):
+    s = ""
+    if isinstance(data, Iterable):
+        for line in data:
+            l = ""
+            if isinstance(line, dict):
+                for key, value in line.items():
+                    l += repr(value) + sep
+            elif isinstance(line, Iterable):
+                for item in data:
+                    l += repr(item) + sep
+            else:
+                l = repr(item)
+            s += l.strip() + '\n'
+    return s
 
 def get_mac(ip):
     mac = None
@@ -47,7 +64,7 @@ relay = relay_module.worker()
 pump = vacuum_pump.worker()
 gauge = pressure_gauge.worker()
 
-tmpr_rtm = temperature_controller.worker_rtm()
+tmpr_rtm = temperature_controller.worker_rtm(temperature_controller=tmpr)
 
 tcp_emul = tcp_emul.worker(temperature_controller = tmpr)
 
@@ -217,12 +234,12 @@ def cmpr_do():
             if cmpr.turn(request.json['action']):
                 return "Command succeeded"
             else:
-                logging.warning("compressor failed to process " + repr(request.json))
+                app.logger.warning("compressor failed to process " + repr(request.json))
                 return "Command failed"
         except:
-            logging.error("an error occured while processing " + repr(request.json))
+            app.logger.error("an error occured while processing " + repr(request.json))
             return "Command failed with an error"
-    logging.info("someone %s tried to manipulate the compressor", mac)
+    app.logger.info("someone %s tried to manipulate the compressor", mac)
     return "Permission denied"
 
 @app.route('/relay_module')
@@ -247,9 +264,9 @@ def relay_do():
             relay.is_on = (request.json['action'] not in [0, False])
             return "Command succeeded"
         except:
-            logging.error("an error occured while processing " + repr(request.json))
+            app.logger.error("an error occured while processing " + repr(request.json))
             return "Command failed with an error"
-    logging.info("someone %s tried to manipulate the pump", mac)
+    app.logger.info("someone %s tried to manipulate the pump", mac)
     return "Permission denied"
 
 @app.route('/vacuum_pump')
@@ -276,12 +293,12 @@ def pump_do():
             if pump.turn(request.json['action']):
                 return "Command succeeded"
             else:
-                logging.warning("pump failed to process " + repr(request.json))
+                app.logger.warning("pump failed to process " + repr(request.json))
                 return "Command failed"
         except:
-            logging.error("an error occured while processing " + repr(request.json))
+            app.logger.error("an error occured while processing " + repr(request.json))
             return "Command failed with an error"
-    logging.info("someone %s tried to manipulate the pump", mac)
+    app.logger.info("someone %s tried to manipulate the pump", mac)
     return "Permission denied"
 
 @app.route('/pressure_gauge')
@@ -369,7 +386,7 @@ def joke():
     except:
         return '''{"jokes":[{"joke_text":"I'm not in the mood of joking :("}]}'''
 
-@app.route('/temperature_controller/rtm', methods = ['POST'])
+@app.route('/temperature_controller/rtm/do', methods = ['POST'])
 def rtm_tmpr():
     if temperature_controller.is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
@@ -384,6 +401,7 @@ def rtm_tmpr():
         else:
             tmpr_rtm.fire()
             return "Measurement started"
+        app.logger.warning('someone tried to start RTM')
     return "Permission denied"
 
 @app.route('/temperature_controller/rtm/json')

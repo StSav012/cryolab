@@ -9,22 +9,6 @@ import sounddevice as sd
 
 is_realtime_measurement_running = False
 
-def csv(data, sep = '\t'):
-    s = ""
-    if isinstance(data, Iterable):
-        for line in data:
-            l = ""
-            if isinstance(line, dict):
-                for key, value in line.items():
-                    l += repr(value) + sep
-            elif isinstance(line, Iterable):
-                for item in data:
-                    l += repr(item) + sep
-            else:
-                l = repr(item)
-            s += l.strip() + '\n'
-    return s
-
 def sine_tone(frequency, duration, volume=1, sample_rate=44100):
     n_samples = int(sample_rate * duration)
     t = np.arange(n_samples) / sample_rate
@@ -49,7 +33,6 @@ class worker(Thread):
         Thread.__init__(self)
         self.daemon = True
         self.ser = serial.Serial()
-        self.communicating = False
         self.temperatures = [None, None]
         self.output = [None, None]
         self.pid_data = {1: {}, 2: {}}
@@ -57,6 +40,7 @@ class worker(Thread):
         self.error_in_sounded = [False, False]
         self.error_out = ["", ""]
         self.error_out_sounded = [False, False]
+        self.communicating = False
 #        self.open_serial()
     def open_serial(self):
         self.communicating = False
@@ -345,13 +329,14 @@ class worker(Thread):
                 sys.exit(0)
 
 class worker_rtm(Thread):
-    def __init__(self):
+    def __init__(self, temperature_controller):
         Thread.__init__(self)
         self.daemon = True
         self.count = 0
         self.label = 'A'
         self.res = []
         self.paused = True
+        self.tmpr = temperature_controller
     def measure(self):
         self.res = []
         global is_realtime_measurement_running
@@ -359,10 +344,10 @@ class worker_rtm(Thread):
             print("another realtime measurement is running")
             return False
         if not (self.label in ['A', 'B']):
-            print("invalid termometer mark:", self.label)
+            print("invalid thermometer mark:", self.label)
             return False
         i = 0
-        while tmpr.communicating:
+        while self.tmpr.communicating:
             time.sleep(0.1)
             i += 1
             if i > 30:      # wait for 3 seconds at most
@@ -375,13 +360,13 @@ class worker_rtm(Thread):
             try:
                 cmd = "rdgst?"
                 try:
-                    resp = tmpr.read(cmd, [self.label]).split(';')[-1].strip()
+                    resp = self.tmpr.read(cmd, [self.label]).split(';')[-1].strip()
                 except:
                     resp = None
                 if resp == "000":
                     cmd = "krdg?"
                     try:
-                        resp = tmpr.read(cmd, [self.label]).split(';')[-1].strip()
+                        resp = self.tmpr.read(cmd, [self.label]).split(';')[-1].strip()
                     except:
                         resp = None
                     if resp != None:

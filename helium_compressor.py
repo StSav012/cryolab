@@ -48,6 +48,7 @@ def snd_warning():
 
 class worker(Thread):
     crc16 = crcmod.predefined.Crc('modbus')
+
     def __init__(self):
         Thread.__init__(self)
         self.daemon = True
@@ -71,6 +72,17 @@ class worker(Thread):
         self.motor_temperature_off = None
         self.system_on = None
 #        self.open_serial()
+
+    def _block(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                print("compressor is very busy")
+                return False
+        return True
+
     def open_serial(self):
         self.communicating = False
         ports = serial.tools.list_ports.comports()
@@ -86,23 +98,18 @@ class worker(Thread):
                 self.ser.write_timeout = 1
                 try:
                     self.ser.open()
-                    time.sleep(1)           # to be changed
                 except:
-                    pass
+                    time.sleep(1)           # to be changed
                 else:
                     print(self.ser.port, "opened for the helium compressor")
                     self.communicating = False
                     break
         if not self.ser.is_open:
             time.sleep(1)
+
     def read_temperatures(self):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("compressor is very busy")
-                return False
+        if not self._block():
+            return False
         cmd = "$TEA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
@@ -114,13 +121,18 @@ class worker(Thread):
                 c = self.ser.read(26)
                 self.ser.flush()
                 self.communicating = False
-            except:
+            except serial.serialutil.SerialException:
                 self.communicating = False
+                self.ser.close()
+                print('restarting ' + self.ser.port)
+                time.sleep(1)
+                self.open_serial()
                 continue
             # debug
             if len(c) == 0:
                 self.ser.close()
                 print('restarting ' + self.ser.port)
+                time.sleep(1)
                 self.open_serial()
                 continue
             resp = c.decode("ascii").split(',')
@@ -141,14 +153,10 @@ class worker(Thread):
         else:
             self.open_serial()
         return True
+    
     def read_pressures(self):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("compressor is very busy")
-                return False
+        if not self._block():
+            return False
         cmd = "$PRA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
@@ -160,13 +168,18 @@ class worker(Thread):
                 c = self.ser.read(18)
                 self.ser.flush()
                 self.communicating = False
-            except:
+            except serial.serialutil.SerialException:
                 self.communicating = False
+                self.ser.close()
+                print('restarting ' + self.ser.port)
+                time.sleep(1)
+                self.open_serial()
                 continue
             # debug
             if len(c) == 0:
                 self.ser.close()
                 print('restarting ' + self.ser.port)
+                time.sleep(1)
                 self.open_serial()
                 continue
             resp = c.decode("ascii").split(',')
@@ -185,14 +198,10 @@ class worker(Thread):
         else:
             self.open_serial()
         return True
+    
     def read_status(self):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("compressor is very busy")
-                return False
+        if not self._block():
+            return False
         cmd = "$STA"
         while self.ser.is_open:
             crc = self.crc16.new(cmd.encode('ascii'))
@@ -204,13 +213,18 @@ class worker(Thread):
                 c = self.ser.read(15)
                 self.ser.flush()
                 self.communicating = False
-            except:
+            except serial.serialutil.SerialException:
                 self.communicating = False
+                self.ser.close()
+                print('restarting ' + self.ser.port)
+                time.sleep(1)
+                self.open_serial()
                 continue
             # debug
             if len(c) == 0:
                 self.ser.close()
                 print('restarting ' + self.ser.port)
+                time.sleep(1)
                 self.open_serial()
                 continue
             resp = c.decode("ascii").split(',')
@@ -245,6 +259,7 @@ class worker(Thread):
         else:
             self.open_serial()
         return True
+    
     def turn(self, action):
         if int(action) == 0:
             return self.do("$OFF")
@@ -253,14 +268,10 @@ class worker(Thread):
         else:
             print("invalid action:,", repr(action))
             return False
+    
     def do(self, cmd):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("compressor is very busy")
-                return False
+        if not self._block():
+            return False
         while self.ser.is_open:
             self.communicating = True
             crc = self.crc16.new(cmd.encode('ascii'))
@@ -270,12 +281,17 @@ class worker(Thread):
                 self.ser.flush()
                 c = self.ser.read(10)
                 self.ser.flush()
-            except:
+            except serial.serialutil.SerialException:
+                self.ser.close()
+                print('restarting ' + self.ser.port)
+                time.sleep(1)
+                self.open_serial()
                 continue
             # debug
             if len(c) == 0:
                 self.ser.close()
                 print('restarting ' + self.ser.port)
+                time.sleep(1)
                 self.open_serial()
                 continue
             resp = c.decode("ascii").split(',')
@@ -296,6 +312,7 @@ class worker(Thread):
             self.open_serial()
         self.communicating = False
         return True
+    
     def run(self):
         while True:
             try:
