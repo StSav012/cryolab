@@ -11,6 +11,7 @@ class worker(Thread):
         self.relay = '1'
         self.is_on = None
         self.communicating = False
+
     def turn(self, on):
         if self.is_on is None:
             return self.is_on
@@ -33,6 +34,7 @@ class worker(Thread):
         except:
             self.communicating = False
             return None
+
     def run(self):
         while True:
             try:

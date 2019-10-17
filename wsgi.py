@@ -24,6 +24,7 @@ import relay_module
 import xmpp_bot
 import tcp_emul
 import redirector
+import autostart
 
 def csv(data, sep = '\t'):
     s = ""
@@ -69,6 +70,8 @@ tmpr_rtm = temperature_controller.worker_rtm(temperature_controller=tmpr)
 tcp_emul = tcp_emul.worker(temperature_controller = tmpr)
 
 redirector = redirector.worker()
+
+autostarter = autostart.worker(relay=relay, pump=pump, compressor=cmpr)
 
 # xmpp = xmpp_bot.bot(config['XMPP']['jid'], config['XMPP']['pass'])
 # # xmpp.register_plugin('xep_0030') # Service Discovery
@@ -118,6 +121,7 @@ tcp_emul.start()
 tmpr_rtm.start()
 pump.start()
 gauge.start()
+autostarter.start()
 
 @app.errorhandler(404)
 def page_not_found(error):
@@ -250,11 +254,11 @@ def relay_index():
                            master_mind = (get_mac(request.remote_addr) in masters_list),
                            relay_on = relay.is_on)
 
-@app.route('/relay_module/json', methods= ['GET'])
+@app.route('/relay_module/json', methods=['GET'])
 def relay_json():
-    return jsonify(relay_on = relay.is_on)
+    return jsonify(relay_on=relay.is_on)
 
-@app.route('/relay_module/do', methods = ['POST'])
+@app.route('/relay_module/do', methods=['POST'])
 def relay_do():
     if temperature_controller.is_realtime_measurement_running:
         return "Please wait 'till a measurement is over"
@@ -266,7 +270,47 @@ def relay_do():
         except:
             app.logger.error("an error occured while processing " + repr(request.json))
             return "Command failed with an error"
-    app.logger.info("someone %s tried to manipulate the pump", mac)
+    app.logger.info("someone %s tried to manipulate the relay", mac)
+    return "Permission denied"
+
+@app.route('/autostart')
+def autostart_index():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    return render_template('autostart.html',
+                           master_mind = (get_mac(request.remote_addr) in masters_list),
+                           autostart_on = autostarter.is_running(),
+                           relay_on = autostarter.relay_on,
+                           water_is_cold = autostarter.water_cold,
+                           pump_on = autostarter.pump_on,
+                           pump_is_ready = autostarter.pump_ready,
+                           compressor_on = autostarter.compressor_on
+                           )
+
+@app.route('/autostart/json', methods=['GET'])
+def autostart_json():
+    return jsonify(
+        autostart_on = autostarter.is_running(),
+        relay_on = autostarter.relay_on,
+        water_is_cold = autostarter.water_cold,
+        pump_on = autostarter.pump_on,
+        pump_is_ready = autostarter.pump_ready,
+        compressor_on = autostarter.compressor_on
+        )
+
+@app.route('/autostart/do', methods=['POST'])
+def autostart_do():
+    if temperature_controller.is_realtime_measurement_running:
+        return "Please wait 'till a measurement is over"
+    mac = get_mac(request.remote_addr)
+    if mac in masters_list:
+        try:
+            autostarter.set_running(request.json['action'] not in [0, False])
+            return "Command succeeded"
+        except:
+            app.logger.error("an error occured while processing " + repr(request.json))
+            return "Command failed with an error"
+    app.logger.info("someone %s tried to manipulate the autostart module", mac)
     return "Permission denied"
 
 @app.route('/vacuum_pump')

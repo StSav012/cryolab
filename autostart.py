@@ -1,29 +1,78 @@
-import serial
-import serial.tools.list_ports
 import time
-import sys
 from threading import Thread
-from subprocess import Popen, PIPE
-import requests
 
 import vacuum_pump
-import pressure_gauge
+import relay_module
+import helium_compressor
 
-pump = vacuum_pump.pump()
+class worker(Thread):
+    def __init__(self, relay, pump, compressor):
+        Thread.__init__(self)
+        self.relay = relay
+        self.pump = pump
+        self.cmpr = compressor
+        self.relay_on = False
+        self.water_cold = False
+        self.pump_on = False
+        self.pump_ready = False
+        self.compressor_on = False
+        self._running = False
+        self.daemon = True
 
-#                pump.do(True)
-#                if not(self.pressure is None) and self.pressure < 1e-2:
-#                    print("ready to start the compressor")
-#                    try:
-#                        cmd = "usbrelay QHF2G_1=1"
-#                        result = Popen(cmd, shell=True, stdout=PIPE)
-#                        time.sleep(1)
-#                        r = requests.post("http://localhost/helium_compressor/do", data={'action': 1})
-#                        print(r.status_code, r.reason)
-#                    except:
-#                        pass
-#                    sys.exit(0)
-#                time.sleep(1)
+    def set_running(self, running):
+        self.relay_on = False
+        self.water_cold = False
+        self.pump_on = False
+        self.pump_ready = False
+        self.compressor_on = False
+        self._running = running
+        print('autostart ' + ('en' if running else 'dis') + 'abled')
 
-gauge = pressure_gauge.worker_gauge()
-gauge.start()
+    def is_running(self):
+        return self._running
+
+    def run(self):
+        while True:
+            while not self._running:
+                time.sleep(1)
+            self.relay_on = False
+            self.water_cold = False
+            self.pump_on = False
+            self.pump_ready = False
+            self.compressor_on = False
+            self.relay.is_on = True
+            while self._running and not self.relay.turn(on=True):
+                time.sleep(1)
+            if not self._running:
+                continue
+            self.relay_on = True
+            print('relay is on')
+            time.sleep(5)
+            while self._running and not self.pump.turn(turn_on=True):
+                time.sleep(1)
+            if not self._running:
+                continue
+            self.pump_on = True
+            print('pump is on')
+            time.sleep(5)
+            while self._running and self.pump.speed and self.pump.speed < 80000:
+                time.sleep(1)
+            if not self._running:
+                continue
+            self.pump_ready = True
+            print('pump is ready')
+            while self._running and (not self.cmpr.temperatures[1] or self.cmpr.temperatures[1] > 20
+                    or not self.cmpr.temperatures[2] or self.cmpr.temperatures[2] > 20):
+                time.sleep(1)
+            if not self._running:
+                continue
+            self.water_cold = True
+            print('water is cold')
+            while self._running and not self.cmpr.turn(action=1):
+                time.sleep(1)
+            if not self._running:
+                continue
+            self.compressor_on = True
+            print('compressor is on')
+            self._running = False
+

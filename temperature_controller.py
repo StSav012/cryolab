@@ -3,7 +3,7 @@ import serial.tools.list_ports
 import time
 import sys
 from threading import Thread
-from collections import Iterable
+from collections import Iterable, deque
 import numpy as np
 import sounddevice as sd
 
@@ -17,16 +17,22 @@ def sine_tone(frequency, duration, volume=1, sample_rate=44100):
             blocking=True,
             device='sysdefault')
 
+
 def snd_notify():
     for i in range(30):
         sine_tone(3135.96, 0.2)
         #sine_tone(2093.00, 0.2)
         sd.sleep(200)
 
+
 def snd_warning():
     for i in range(4):
         sine_tone(2093.00, 0.2)
         sine_tone(1760.00, 0.2)
+
+
+def mean(arr):
+    return sum(arr) / len(arr)
 
 class worker(Thread):
     def __init__(self):
@@ -41,7 +47,9 @@ class worker(Thread):
         self.error_out = ["", ""]
         self.error_out_sounded = [False, False]
         self.communicating = False
+        self.last_temperatures = [deque(maxlen=120)] * 2
 #        self.open_serial()
+
     def open_serial(self):
         self.communicating = False
         ports = serial.tools.list_ports.comports()
@@ -58,9 +66,10 @@ class worker(Thread):
                 if not self.ser.is_open:
                     try:
                         self.ser.open()
-                        time.sleep(1)           # to be changed
-                    except:
+                    except (serial.SerialException, TypeError):
                         pass
+                    else:
+                        time.sleep(1)
                 if self.ser.is_open:
                     print(port.device, 'opened for the temperature controller')
                     self.ser.write(b'*idn?')
@@ -68,6 +77,7 @@ class worker(Thread):
                     break
         if not self.ser.is_open:
             time.sleep(1)
+
     def read_temperatures(self):
         for index, letter in zip([0, 1], ['A', 'B']):
             cmd = "rdgst?"
@@ -79,16 +89,23 @@ class worker(Thread):
                 cmd = "krdg?"
                 try:
                     resp = self.read(cmd, [letter]).split(';')[-1].strip()
-                except:
+                except (serial.SerialException, TypeError):
                     resp = None
                 if resp != None:
                     try:
                         temp = float(resp)
-                    except:
+                    except (TypeError, ValueError):
                         self.temperatures[index] = None
                     else:
-                        if self.temperatures[index] != None and temp < 77 and self.temperatures[index] > 77:
-                            snd_notify()
+                        if len(self.last_temperatures[index]) != 0:
+                            prev_mean_temp = mean(self.last_temperatures[index])
+                        else:
+                            prev_mean_temp = None
+                        self.last_temperatures[index].append(temp)
+                        if prev_mean_temp is not None and prev_mean_temp > 77:
+                            mean_temp = mean(self.last_temperatures[index])
+                            if mean_temp < 77:
+                                snd_notify()
                         self.temperatures[index] = temp
                         self.error_in[index] = ""
                         self.error_in_sounded[index] = False
@@ -133,6 +150,7 @@ class worker(Thread):
                             snd_warning()
                             self.error_in_sounded[index] = True
         return
+
     def read_output(self):
         for index, letter in zip([0, 1], ['1', '2']):
             cmd = "htrst?"
@@ -149,7 +167,7 @@ class worker(Thread):
                 if resp != None:
                     try:
                         self.output[index] = float(resp)
-                    except:
+                    except (TypeError, ValueError):
                         self.output[index] = None
                     else:
                         self.error_out[index] = ""
@@ -161,7 +179,7 @@ class worker(Thread):
                 if resp != None and len(resp) > 0:
                     try:
                         r = int(resp)
-                    except:
+                    except (TypeError, ValueError):
                         pass
                     else:
                         if r == 1:
@@ -175,6 +193,7 @@ class worker(Thread):
                             snd_warning()
                             self.error_out_sounded[index] = True
         return
+
     def pid_turn(self, data):
         try:
             output = data['output']
@@ -240,6 +259,7 @@ class worker(Thread):
                                 'manual':         data['manual']
                                 }
         return ok
+
     def read(self, cmd, payload):
         resp = None
         if self.ser.is_open:
@@ -259,18 +279,20 @@ class worker(Thread):
             try:
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
-                resp = self.ser.readline().decode("ascii")[:-1]
+                resp = self.ser.readline().decode()[:-1]
+            except (serial.SerialException, TypeError, UnicodeError):
+                self.ser.close()
+                print("restarting " + self.ser.port)
+                self.open_serial()
+            else:
                 if len(resp) == 0:
                     self.ser.close()
                     print("restarting " + self.ser.port)
                     self.open_serial()
-            except:
-                self.ser.close()
-                print("restarting " + self.ser.port)
-                self.open_serial()
         else:
             self.open_serial()
         return resp
+    
     def do(self, cmd, payload):
         i = 0
         while self.communicating:
@@ -298,7 +320,7 @@ class worker(Thread):
                 self.communicating = True
                 self.ser.write(msg.encode('ascii'))
                 self.ser.flush()
-            except:
+            except (serial.SerialException, TypeError):
                 self.ser.close()
                 self.open_serial()
                 self.communicating = False
@@ -309,6 +331,7 @@ class worker(Thread):
             return False
         self.communicating = False
         return True
+    
     def run(self):
         global is_realtime_measurement_running
         while True:
@@ -321,12 +344,17 @@ class worker(Thread):
                 else:
                     self.temperatures = [None, None]
                     self.output = [None, None]
-                time.sleep(0.1)
+                time.sleep(0.05)
             except (KeyboardInterrupt, SystemExit):
                 print('caught ctrl+c')
+                try:
+                    self.ser.close()
+                except (serial.SerialException, TypeError):
+                    pass
                 self.communicating = False
                 self.join()
                 sys.exit(0)
+
 
 class worker_rtm(Thread):
     def __init__(self, temperature_controller):
@@ -337,6 +365,7 @@ class worker_rtm(Thread):
         self.res = []
         self.paused = True
         self.tmpr = temperature_controller
+
     def measure(self):
         self.res = []
         global is_realtime_measurement_running
@@ -379,8 +408,10 @@ class worker_rtm(Thread):
         is_realtime_measurement_running = False
         print("measurement finished")
         return True
+
     def fire(self):
         self.paused = False
+
     def run(self):
         try:
             while True:

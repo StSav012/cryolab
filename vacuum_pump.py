@@ -10,6 +10,7 @@ class worker(Thread):
     parameter_pump_on = b'000'
     parameter_status = b'205'
     parameter_speed_hz = b'203'
+
     def __init__(self):
         Thread.__init__(self)
         self.ser = serial.Serial()
@@ -19,12 +20,14 @@ class worker(Thread):
         self.communicating = False
         self.daemon = True
 #        self.open_serial()
-    def checksum(self, cmd):
+    
+    def _checksum(self, cmd):
         csk = cmd[1]
         for c in cmd[2:]:
             csk ^= c
         return format(csk, 'X').encode('ascii')
-    def make_cmd(self, cmd_code, payload = b''):
+    
+    def _make_cmd(self, cmd_code, payload = b''):
         if len(cmd_code) != 3:
             # print('incorrect command code:', cmd_code)
             return None
@@ -34,8 +37,19 @@ class worker(Thread):
         cmd += bytes([self.true if payload else self.false])
         cmd += payload
         cmd += bytes([0x03])
-        cmd += self.checksum(cmd)
+        cmd += self._checksum(cmd)
         return cmd
+
+    def _block(self):
+        i = 0
+        while self.communicating:
+            time.sleep(0.1)
+            i += 1
+            if i > 30:      # wait for 3 seconds at most
+                # print("pump is very busy")
+                return False
+        return True
+    
     def open_serial(self):
         self.communicating = False
         ports = serial.tools.list_ports.comports()
@@ -52,7 +66,7 @@ class worker(Thread):
                 if not self.ser.is_open:
                     try:
                         self.ser.open()
-                    except:
+                    except (serial.SerialException, TypeError):
                         pass
                     finally:
                         time.sleep(self.ser.timeout)
@@ -61,14 +75,10 @@ class worker(Thread):
                     break
 
     def set_bool(self, parameter, value):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                # print("pump is very busy")
-                return None
-        msg = self.make_cmd(parameter, bytes([self.true if value else self.false]))
+        if not self._block():
+            # print("pump is very busy")
+            return None
+        msg = self._make_cmd(parameter, bytes([self.true if value else self.false]))
         if self.ser.is_open:
             try:
                 self.communicating = True
@@ -80,8 +90,10 @@ class worker(Thread):
                 self.communicating = False
                 # print('response:', resp)
                 # check for validity
-                if len(resp) != 6 or self.checksum(resp[:-2]) != resp[-2:]:
+                if len(resp) != 6 or self._checksum(resp[:-2]) != resp[-2:]:
                     # print('incorrect response', resp, 'to', msg)
+                    self.ser.reset_input_buffer()
+                    self.ser.reset_output_buffer()
                     return None
                 elif resp[2] == 6:
                     # print('request acknowledged')
@@ -92,7 +104,7 @@ class worker(Thread):
             except:
                 try:
                     self.ser.close()
-                except:
+                except (serial.SerialException, TypeError):
                     print("can't close", self.ser.port)
                     pass
                 self.open_serial()
@@ -101,14 +113,10 @@ class worker(Thread):
         return False
 
     def get_bool(self, parameter):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("pump is very busy")
-                return None
-        msg = self.make_cmd(parameter)
+        if not self._block():
+            print("pump is very busy")
+            return None
+        msg = self._make_cmd(parameter)
         if self.ser.is_open:
             try:
                 self.communicating = True
@@ -118,20 +126,24 @@ class worker(Thread):
                 resp = self.ser.read(10)
                 self.ser.flush()
                 self.communicating = False
-                # check for validity: checksum and value
+                # check for validity: _checksum and value
                 # print('response:', resp)
-                if len(resp) == 6 and self.checksum(resp[:-2]) == resp[-2:]:
+                if len(resp) == 6 and self._checksum(resp[:-2]) == resp[-2:]:
                     # print('command', msg, 'failed with code', hex(resp[2]))
                     return None
-                if len(resp) != 10 or resp[:6] != msg[:6] or self.checksum(resp[:-2]) != resp[-2:]:
+                if len(resp) != 10 or resp[:6] != msg[:6] or self._checksum(resp[:-2]) != resp[-2:]:
                     # print('incorrect response', resp, 'to', msg)
+                    self.ser.reset_input_buffer()
+                    self.ser.reset_output_buffer()
                     return None
                 if resp[6] in [self.true, self.false]:
                     return resp[6] == self.true
                 else:
                     # print('incorrect response', resp, 'to', msg)
+                    self.ser.reset_input_buffer()
+                    self.ser.reset_output_buffer()
                     return None
-            except:
+            except (serial.SerialException, TypeError):
                 try:
                     self.ser.close()
                 except:
@@ -143,14 +155,10 @@ class worker(Thread):
         return None
 
     def get_int6(self, parameter):
-        i = 0
-        while self.communicating:
-            time.sleep(0.1)
-            i += 1
-            if i > 30:      # wait for 3 seconds at most
-                print("pump is very busy")
-                return None
-        msg = self.make_cmd(parameter)
+        if not self._block():
+            print("pump is very busy")
+            return None
+        msg = self._make_cmd(parameter)
         if self.ser.is_open:
             try:
                 self.communicating = True
@@ -162,22 +170,26 @@ class worker(Thread):
                 self.communicating = False
                 # check for validity: checksum and value
                 # print('response:', resp)
-                if len(resp) == 6 and self.checksum(resp[:-2]) == resp[-2:]:
+                if len(resp) == 6 and self._checksum(resp[:-2]) == resp[-2:]:
                     # print('command', msg, 'failed with code', hex(resp[2]))
                     return None
-                if len(resp) != 15 or resp[:6] != msg[:6] or self.checksum(resp[:-2]) != resp[-2:]:
+                if len(resp) != 15 or resp[:6] != msg[:6] or self._checksum(resp[:-2]) != resp[-2:]:
                     # print('incorrect response', resp, 'to', msg)
+                    self.ser.reset_input_buffer()
+                    self.ser.reset_output_buffer()
                     return None
                 else:
                     try:
                         return int(resp[6:12])
-                    except:
+                    except (TypeError, ValueError):
                         # print('incorrect response', resp, 'to', msg)
+                        self.ser.reset_input_buffer()
+                        self.ser.reset_output_buffer()
                         return None
             except:
                 try:
                     self.ser.close()
-                except:
+                except (serial.SerialException, TypeError):
                     print("can't close", self.ser.port)
                     pass
                 self.open_serial()
@@ -204,6 +216,10 @@ class worker(Thread):
                 time.sleep(1 if self.ser.timeout is None else self.ser.timeout)
             except (KeyboardInterrupt, SystemExit):
                 print('caught ctrl+c')
+                try:
+                    self.ser.close()
+                except (serial.SerialException, TypeError):
+                    pass
                 self.communicating = False
                 self.join()
                 sys.exit(0)
