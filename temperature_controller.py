@@ -12,10 +12,13 @@ is_realtime_measurement_running = False
 def sine_tone(frequency, duration, volume=1, sample_rate=44100):
     n_samples = int(sample_rate * duration)
     t = np.arange(n_samples) / sample_rate
-    sd.play(volume * np.sin(2 * np.pi * frequency * t),
-            samplerate=sample_rate,
-            blocking=True,
-            device='sysdefault')
+    try:
+        sd.play(volume * np.sin(2 * np.pi * frequency * t),
+                samplerate=sample_rate,
+                blocking=True,
+                device='sysdefault')
+    except ValueError:
+        pass
 
 
 def snd_notify():
