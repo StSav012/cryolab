@@ -55,7 +55,7 @@ class worker(Thread):
             self.pump_on = True
             print('pump is on')
             time.sleep(5)
-            while self._running and self.pump.speed and self.pump.speed < 80000:
+            while self._running and (self.pump.speed is None or self.pump.speed < 80000):
                 time.sleep(1)
             if not self._running:
                 continue
